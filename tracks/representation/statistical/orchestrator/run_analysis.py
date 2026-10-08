@@ -299,6 +299,9 @@ def run_statistical_analysis(
 
     stat_cfg = cfg.get("statistical_analysis", {}) or {}
     min_nonzero = int(stat_cfg.get("confirmatory_min_nonzero", 15))
+    # Separate generator for the patient-cluster sign-flip tests, so they do
+    # not consume draws from ``rng`` (whose sequence drives every bootstrap CI).
+    perm_rng = np.random.default_rng(int(cfg.get("global_seed", 42)) + 1)
     fig_dpi = int(stat_cfg.get("figure_dpi", 150))
 
     patient_col = cfg.get("patient_col", "Patient")
@@ -382,6 +385,7 @@ def run_statistical_analysis(
     h1_df = h1_binomial_per_class(
         delta_p, delta_m, class_list, eligible_classes,
         patient_ids, n_resamples, rng,
+        n_permutations=n_permutations, perm_rng=perm_rng,
     )
     _save_csv(output_dir / "h1_per_class.csv", h1_df)
     logger.info("H1 per-class done: %d confirmatory classes.", len(eligible_classes))
@@ -406,11 +410,14 @@ def run_statistical_analysis(
     # ------------------------------------------------------------------
     # Step 6 — H1 CMH pooled cross-class
     # ------------------------------------------------------------------
-    h1_cmh = h1_cmh_test(delta_p, delta_m, eligible_classes, class_list)
+    h1_cmh = h1_cmh_test(
+        delta_p, delta_m, eligible_classes, class_list,
+        patient_ids=patient_ids, n_permutations=n_permutations, perm_rng=perm_rng,
+    )
     _save_json(output_dir / "h1_cmh.json", h1_cmh)
     logger.info(
-        "H1 CMH: OR=%.3f, p=%.4f",
-        h1_cmh["common_odds_ratio"], h1_cmh["p_cmh"],
+        "H1 CMH: OR=%.3f, p=%.4f, cluster p=%.4f",
+        h1_cmh["common_odds_ratio"], h1_cmh["p_cmh"], h1_cmh["p_cluster"],
     )
 
     # ------------------------------------------------------------------
@@ -419,6 +426,7 @@ def run_statistical_analysis(
     from ..hypotheses.h2 import h2_wilcoxon_per_class, h2_wasserstein_per_class, h2_macro_summary
     h2_df = h2_wilcoxon_per_class(
         y_hat_cf, y_hat_ca, y_interview, class_list, patient_ids, n_resamples, rng,
+        n_permutations=n_permutations, perm_rng=perm_rng,
     )
     _save_csv(output_dir / "h2_brier.csv", h2_df)
 

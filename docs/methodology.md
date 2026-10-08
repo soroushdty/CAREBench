@@ -92,7 +92,7 @@ The two tracks currently number their hypotheses differently. The table maps the
 | **H1 – Context sensitivity** | Mean \|Δ_model\| over all cells, overall and per category | Patient-cluster bootstrap 95% CI |
 | **H2 – Directional alignment** | On cells with Δ_ref ≠ 0: mean alignment `sign(Δ_ref)·Δ_model`, and sign-agreement rate `sign(Δ_model) = sign(Δ_ref)` | Patient-cluster bootstrap 95% CIs |
 | **H3 – Class-level correspondence** | Pearson *r* between the per-category mean Δ_ref and mean Δ_model | One-sided permutation test over category labels |
-| **H4 – Correct vs shuffled context** | On cells with Δ_ref ≠ 0: mean of `sign(Δ_ref)·(Δ_model − Δ_shuffled)` | Patient-cluster bootstrap 95% CI; one-sided paired permutation test |
+| **H4 – Correct vs shuffled context** | On cells with Δ_ref ≠ 0: mean of `sign(Δ_ref)·(Δ_model − Δ_shuffled)` | Patient-cluster bootstrap 95% CI; one-sided patient-cluster sign-flip test |
 
 A zero model delta counts as disagreement in the sign-agreement rate.
 
@@ -102,10 +102,10 @@ Confirmatory analyses are restricted to categories with at least `confirmatory_m
 
 | | Statistic | Uncertainty / test |
 |---|---|---|
-| **H1 – Directional alignment, per class** | Sign-agreement rate on cells with Δ_ref ≠ 0 | Exact one-sided binomial test against 0.5; Benjamini–Hochberg across eligible classes; patient-cluster bootstrap CI |
+| **H1 – Directional alignment, per class** | Sign-agreement rate on cells with Δ_ref ≠ 0 | One-sided patient-cluster sign-flip test of rate > 0.5 (`cluster_p`); Benjamini–Hochberg across eligible classes; patient-cluster bootstrap CI. The exact binomial p-value (`binom_p`) is kept for reference only |
 | **H1 – Directional alignment, pooled** | Sign-agreement rate pooled over eligible classes | Permutation test that shuffles model deltas among the items of the same patient (tests item-level specificity within patients); patient-cluster bootstrap CI |
-| **H1 – Cross-class** | Mantel–Haenszel common odds ratio, stratified by class | CMH test |
-| **H2 – Contextual alignment** | Per-class Brier improvement `Brier(context_free) − Brier(correct_context)` against correct-context labels | One-sided Wilcoxon signed-rank; Benjamini–Hochberg; patient-cluster bootstrap CI; macro summary |
+| **H1 – Cross-class** | Mantel–Haenszel common odds ratio, stratified by class | Patient-cluster sign-flip test of pooled sign agreement > 0.5 on the same cells (`p_cluster`); the CMH p-value (`p_cmh`) is kept for reference only |
+| **H2 – Contextual alignment** | Per-class Brier improvement `Brier(context_free) − Brier(correct_context)` against correct-context labels | One-sided patient-cluster sign-flip test (`cluster_p`); Benjamini–Hochberg; patient-cluster bootstrap CI; macro summary. The Wilcoxon signed-rank p-value (`wilcoxon_p`) is kept for reference only |
 
 Secondary and descriptive outputs: Wasserstein distance to the label distribution, ICC(2,1) and Lin's CCC of the model against each observer compared with observer–observer agreement, expected calibration error, context-induced entropy change, repeated vs novel item strata, per-field context ablation, and fusion-architecture comparison.
 
@@ -113,6 +113,7 @@ Secondary and descriptive outputs: Wasserstein distance to the label distributio
 
 - **Bootstrap.** All confidence intervals are percentile intervals from a patient-cluster bootstrap (`shared/statistical/bootstrap.py`): whole patients are resampled with replacement, default 1,000 resamples. With fewer than two patients the CI is reported as NaN.
 - **Permutation tests.** Default 10,000 permutations. p-values are one-sided, in the direction of the hypothesis.
+- **Patient-cluster sign-flip test** (`shared/statistical/cluster_tests.py`). Used wherever a test compares cell-level values with zero (H4 in Track 3; the per-class H1, pooled CMH companion and H2 tests in Track 1). Under the null, each patient's summed contribution is symmetric about zero, so its sign is flipped as a block; the statistic is the mean over cells. When `2^(number of patients)` is at most the permutation count, all sign patterns are enumerated and the test is exact. **The smallest attainable p-value is then `2^−(number of patients)`**: 1/64 with six patients, 1/1024 with ten. This floor is the real limit of a design with that many patients, not an artifact of the test. Tests that treat cells as independent (`binom_p`, `p_cmh`, `wilcoxon_p`) are still written to the outputs for comparison but are not used for decisions.
 - **Multiplicity.** Track 1 applies Benjamini–Hochberg (q = 0.05) across classes. Track 3 reports per-category results descriptively and does not correct them.
 - **Seeds.** Bootstrap, permutation, shuffled-context and generation seeds are set in config and recorded in the run manifest. `PYTHONHASHSEED` must be set before Python starts (see the README).
 
@@ -141,8 +142,6 @@ Results are claims about **the patients and reference observers in the evaluated
 
 These are known gaps between the intended design and the current code.
 
-- **H4's permutation test is not cluster-aware.** It flips each cell's correct/shuffled pair independently, which is equivalent to an unclustered sign-flip test and can understate the p-value when cells within a patient are correlated. Its bootstrap CI is clustered. ([#16](https://github.com/soroushdty/CAREBench/issues/16))
-- **Some Track 1 p-values treat cells as independent.** The per-class binomial test, the CMH test, and the per-class Wilcoxon test do not account for clustering by patient; their bootstrap CIs do. ([#16](https://github.com/soroushdty/CAREBench/issues/16))
 - **Track 3's H1 and H2 have intervals but no reference point.** Mean \|Δ_model\| is above zero for almost any model that reads the context at all, and the chance level of the sign-agreement rate is not 0.5 when zero deltas count as disagreement. The shuffled-context condition provides the natural reference for both. ([#17](https://github.com/soroushdty/CAREBench/issues/17))
 - **H3 is a correlation over the number of categories** (ten by default), so it has little power and is best read descriptively.
 - **No simulation-based validation yet.** The false-positive rate and power of the endpoints under known effects have not been measured. ([#18](https://github.com/soroushdty/CAREBench/issues/18))

@@ -351,7 +351,7 @@ def _section_h4(h4_df: pd.DataFrame, cats: list[str]) -> str:
         lines.append(f"- **Mean alignment difference (correct − shuffled):** "
                      f"{_fmt(r.get('mean_alignment_difference'))}")
         lines.append(f"- **95% CI:** {_fmt_ci(r.get('ci_low_difference'), r.get('ci_high_difference'))}")
-        lines.append(f"- **Paired permutation p-value:** {_fmt_p(r.get('paired_permutation_p'))}\n")
+        lines.append(f"- **Patient-cluster sign-flip p-value:** {_fmt_p(r.get('paired_permutation_p'))}\n")
 
         lines.append("| Category | Mean Diff | CI | n Shift Cells | p-value |")
         lines.append("|---|---|---|---|---|")

@@ -1,0 +1,163 @@
+{
+  "1": {
+    "summary": "46-year-old woman with a history of opioid use disorder in sustained remission.",
+    "medical_history": [
+      "Chronic low back pain",
+      "Hepatitis C, treated"
+    ],
+    "allergies": [
+      "Penicillin"
+    ],
+    "medication_history": [
+      "Naloxone nasal spray 4 mg"
+    ],
+    "social_history": [
+      "Works as a cashier",
+      "Attends weekly peer support group"
+    ],
+    "labs": [
+      "Hepatitis C RNA undetectable"
+    ],
+    "radiology": [
+      "Lumbar spine MRI (mild degenerative changes)"
+    ],
+    "procedures": [
+      "Physical therapy evaluation"
+    ]
+  },
+  "2": {
+    "summary": "31-year-old man with a history of HIV infection on antiretroviral therapy.",
+    "medical_history": [
+      "Latent syphilis, treated",
+      "Seasonal allergic rhinitis"
+    ],
+    "allergies": [
+      "No known allergies"
+    ],
+    "medication_history": [
+      "Bictegravir/emtricitabine/tenofovir alafenamide"
+    ],
+    "social_history": [
+      "Graduate student",
+      "In a monogamous relationship"
+    ],
+    "labs": [
+      "CD4 count 640 cells/uL",
+      "HIV viral load undetectable"
+    ],
+    "radiology": [
+      "No imaging on file"
+    ],
+    "procedures": [
+      "Routine vaccination review"
+    ]
+  },
+  "3": {
+    "summary": "58-year-old man with alcohol use disorder and recent job loss.",
+    "medical_history": [
+      "Essential hypertension",
+      "Alcoholic fatty liver"
+    ],
+    "allergies": [
+      "Sulfa drugs"
+    ],
+    "medication_history": [
+      "Naltrexone 50 mg",
+      "Thiamine 100 mg"
+    ],
+    "social_history": [
+      "Recently laid off from construction work",
+      "Divorced"
+    ],
+    "labs": [
+      "Mean corpuscular volume 104 fL (elevated)"
+    ],
+    "radiology": [
+      "Liver ultrasound (increased echogenicity)"
+    ],
+    "procedures": [
+      "Alcohol withdrawal assessment"
+    ]
+  },
+  "4": {
+    "summary": "27-year-old woman, 10 weeks pregnant, with a history of depression.",
+    "medical_history": [
+      "Major depressive disorder, recurrent, in partial remission",
+      "Asthma, mild intermittent"
+    ],
+    "allergies": [
+      "Latex"
+    ],
+    "medication_history": [
+      "Prenatal vitamin",
+      "Escitalopram 10 mg"
+    ],
+    "social_history": [
+      "Lives with partner",
+      "Reports partner monitors her phone"
+    ],
+    "labs": [
+      "Blood type O positive"
+    ],
+    "radiology": [
+      "First-trimester ultrasound (single live intrauterine pregnancy)"
+    ],
+    "procedures": [
+      "Prenatal intake visit"
+    ]
+  },
+  "5": {
+    "summary": "67-year-old man with a family history of hereditary cancer syndromes.",
+    "medical_history": [
+      "Type 2 diabetes mellitus",
+      "Hyperlipidemia"
+    ],
+    "allergies": [
+      "No known allergies"
+    ],
+    "medication_history": [
+      "Metformin 1000 mg",
+      "Atorvastatin 40 mg"
+    ],
+    "social_history": [
+      "Retired teacher",
+      "Lives with spouse"
+    ],
+    "labs": [
+      "Prostate-specific antigen 1.1 ng/mL"
+    ],
+    "radiology": [
+      "Colonoscopy referral pending"
+    ],
+    "procedures": [
+      "Genetic counseling visit"
+    ]
+  },
+  "6": {
+    "summary": "39-year-old woman with spinal cord injury after an assault three years ago.",
+    "medical_history": [
+      "Incomplete paraplegia",
+      "Post-traumatic stress disorder"
+    ],
+    "allergies": [
+      "Codeine"
+    ],
+    "medication_history": [
+      "Baclofen 10 mg",
+      "Prazosin 2 mg"
+    ],
+    "social_history": [
+      "Receives disability benefits",
+      "Housing assistance application pending"
+    ],
+    "labs": [
+      "Urinalysis (normal)"
+    ],
+    "radiology": [
+      "Thoracic spine CT (stable post-surgical changes)"
+    ],
+    "procedures": [
+      "Wheelchair seating evaluation"
+    ]
+  }
+}

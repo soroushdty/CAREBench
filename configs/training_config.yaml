@@ -1,0 +1,221 @@
+# fusion_strategy: How to combine item and context embeddings. Possible values:
+#   4_vector         → [e_i, c_p, e_i * c_p, |e_i - c_p|] (default, most expressive)
+#   2d               → [e_i, c_p] (simple concatenation)
+#   3d               → [e_i, c_p, e_i * c_p] (adds elementwise product)
+#   lowrank_bilinear → [e_i, c_p] (for use with LowRankBilinearFusionModel)
+fusion_strategy: 2d
+lowrank_bilinear_r: 8
+# =============================================================================
+# PRIMARY THRESHOLD CONFIGURATION
+# -----------------------------------------------------------------------------
+# primary_threshold: tau (default) | fixed_f1
+# tau: fixed decision threshold used when primary_threshold = tau
+# fixed_f1_threshold: fixed threshold used when primary_threshold = fixed_f1
+# F1 sweeps (threshold_search_*) are run for robustness reporting only.
+# For model selection and H2, prefer Brier/calibration over F1.
+# =============================================================================
+primary_threshold: tau
+tau: 0.5
+fixed_f1_threshold: 0.5
+threshold_search_min: 0.05
+# =============================================================================
+# CLASS WEIGHTING
+# -----------------------------------------------------------------------------
+# class_weight_mode: cui (default) | inverse_frequency
+# class_weight_beta: 0.999 (default for cui)
+# =============================================================================
+class_weight_mode: cui
+class_weight_beta: 0.999
+weight_cap: 10.0
+# =============================================================================
+# TRAINING CONFIGURATION
+# =============================================================================
+# All model architecture, training, HP search, tuning, and calibration keys
+# live here. Loaded automatically by load_prerequisites() and merged into cfg
+# after config/config.yaml. Keys here take precedence over config/config.yaml.
+# =============================================================================
+
+# =============================================================================
+# MODEL ARCHITECTURE
+# hidden_dims controls model type:
+#   []       → logistic regression (linear probe, fastest, default)
+#   [64]     → 1-hidden-layer MLP
+#   [64, 32] → 2-hidden-layer MLP
+# dropout and activation are ignored when hidden_dims is empty.
+# =============================================================================
+hidden_dims: []
+dropout: 0.3
+# Activation for hidden layers: gelu | relu
+activation: gelu
+
+# =============================================================================
+# CORE TRAINING
+# =============================================================================
+global_seed: 42
+num_epochs: 50
+early_stopping_patience: 5
+# Metric used for early stopping and model selection each epoch.
+objective: F1
+
+# =============================================================================
+# OPTIMIZATION FLAGS
+# =============================================================================
+# Fuse model forward pass + loss into fewer CUDA kernel launches.
+# Set false on CPU-only machines, Windows, or PyTorch < 2.0.
+use_torch_compile: false
+# Enable automatic mixed precision (AMP) training on CUDA. Reduces GPU memory
+# and speeds up compute. Set false to debug NaN losses or on older GPUs.
+use_amp: true
+# How often (in epochs) to emit a DEBUG heartbeat line during training.
+# Set 0 to suppress epoch-level logging entirely.
+log_epoch_interval: 10
+# Write per-fold HP grid search scores to a CSV for diagnostics.
+# Set true to inspect inner Brier scores across all alpha candidates.
+log_hp_search_grid: true
+
+# =============================================================================
+# DIMENSIONALITY REDUCTION
+# =============================================================================
+# Fixed PCA components (GPU SVD). Choose at elbow of explained-variance curve.
+# Typical range for 768-dim Bio_ClinicalBERT embeddings: 80–200.
+pca_n_components: 150
+# Whitening corrects BERT-family anisotropy. Set false for contrastive models
+# (Sentence Transformers, BGE, E5, MiniLM).
+pca_whiten: true
+
+# =============================================================================
+# TRAINING HYPERPARAMETERS
+# =============================================================================
+lr: 0.001
+weight_decay: 0.0001
+batch_size: 2048
+weight_cap: 10.0
+
+# =============================================================================
+# THRESHOLD TUNING
+# =============================================================================
+threshold_objective: F1
+threshold_beta: 1.0
+threshold_search_min: 0.30
+threshold_search_max: 0.70
+threshold_search_points: 9
+threshold_search_grid: null
+threshold_min_precision_floor: null
+threshold_min_recall_floor: null
+threshold_min_value: 0.01
+threshold_max_value: 0.99
+threshold_max_predicted_positive_rate: null
+
+# =============================================================================
+# PROBABILITY CALIBRATION
+# Supported values: none | isotonic
+# =============================================================================
+calibration_method: isotonic
+calibration_min_samples: 10
+
+# =============================================================================
+# EXPECTED CALIBRATION ERROR (ECE)
+# -----------------------------------------------------------------------------
+# ece_n_bins:      Equal-width bins over [0, 1] for the ECE histogram.
+# ece_n_resamples: Bootstrap resamples for the 95% CI (cluster bootstrap).
+# =============================================================================
+ece_n_bins: 15
+ece_n_resamples: 1000
+
+# =============================================================================
+# STAGE 2 STACKING (RIDGE META-MODEL)
+# -----------------------------------------------------------------------------
+# After LOPO-CV Stage 1 produces calibrated OOF predictions, a per-class Ridge
+# meta-model is fitted on those OOF probabilities (shape: n_train × n_classes).
+# Regularisation strength α is selected per-class via leave-one-out GCV.
+# The fitted Ridge models are stored in the bundle and applied automatically
+# during inference (EnsemblePredictor.predict_proba).
+#
+# Set to null or omit this key entirely to disable Stage 2.
+# =============================================================================
+stage2_alpha_options:
+  - 0.1
+  - 1.0
+  - 10.0
+  - 100.0
+  - 1000.0
+
+# Prevalence-shift regularisation: penalises the batch-mean Stage 2 prediction for
+# each class drifting away from the Stage 1 batch-mean. Prevents the fusion head from
+# learning a global upward bias instead of patient-specific corrections. Set 0.0 to
+# disable (backward-compatible). 1.0 is a reasonable starting point; increase if
+# per-class delta logging reports direction mismatches for multiple classes.
+stage2_delta_reg_weight: 1.0
+
+stage2_pca_n_components: null   # 768 → n dims before fusion; matches Stage 1 PCA; set null to disable
+stage2_use_cf_passthrough: true  # prepend ŷ_cf to Z so head learns corrections
+
+# Fusion head optimisation settings.
+stage2_lr: 0.01
+stage2_num_epochs: 200
+stage2_early_stopping_patience: 20
+
+# =============================================================================
+# INFERENCE
+# -----------------------------------------------------------------------------
+# Controls persistent model loading for lower-latency inference from bundles.
+# These keys are read by load_ensemble_predictor() when a cfg dict is passed.
+# =============================================================================
+
+inference:
+  # Master switch for cross-call persistence.
+  # true  → the module-level ModelRegistry caches the loaded EnsemblePredictor;
+  #          subsequent load_ensemble_predictor() calls for the same bundle path
+  #          return the live instance without re-deserialising from disk.
+  # false → registry is bypassed; each call returns a fresh predictor.
+  persistent_models: true
+
+  # Maximum number of distinct bundles held in the registry simultaneously.
+  # When the limit is reached the least-recently-used entry is evicted and its
+  # live models are released from memory.  Must be a positive integer.
+  model_cache_size: 1
+
+  # If true, load_ensemble_predictor() calls materialize() immediately after
+  # loading the bundle, pre-warming all PyTorch model instances before the
+  # first predict_proba() call.  Trades a small load-time cost for zero
+  # materialisation latency on the first inference.
+  eager_materialize: false
+
+# =============================================================================
+# GPU UTILIZATION MONITOR
+# -----------------------------------------------------------------------------
+# Controls background GPU sampling during LOPO-CV training.
+# Results are written to gpu_utilization.json (always) and
+# gpu_utilization.png (if save_chart is true) in the run output folder.
+# The JSON summary contains upgrade_recommended (bool) and upgrade_reason
+# (string) as the primary decision outputs.
+# =============================================================================
+GPU_MONITOR:
+  # Master switch. Set to false to disable all GPU monitoring.
+  enabled: true
+  # Seconds between nvidia-smi polls. Lower = finer resolution,
+  # slightly more subprocess overhead.
+  poll_interval_s: 1.0
+  # SM utilization (%) above which a sample is counted as "active".
+  # Filters out CPU-bound idle periods between epochs so that
+  # sm_util_mean_active_pct reflects true GPU efficiency.
+  active_util_threshold_pct: 10
+  # Active-mean SM utilization (%) at or above which upgrade_recommended
+  # is set to true. Set lower (e.g. 60) for a more conservative threshold
+  # or higher (e.g. 80) for a stricter one.
+  upgrade_sm_threshold_pct: 70
+  # Whether to generate and save the PNG chart alongside the JSON summary.
+  # Set to false if you only want the machine-readable summary.
+  save_chart: true
+  
+# =============================================================================
+# STATISTICAL ANALYSIS (§3.7 / §5)
+# Set enabled: true to run all hypothesis tests and figures after training.
+# =============================================================================
+statistical_analysis:
+  enabled: true
+  n_resamples: 1000 # Bootstrap CI resamples
+  n_permutations: 10000 # H1 patient-clustered permutation test replicates
+  confirmatory_min_nonzero: 15 # Min non-zero Δ_p count for confirmatory eligibility (§3.1.1)
+  figure_format: png # png or pdf
+  figure_dpi: 150

@@ -1,0 +1,67 @@
+# Main pipeline configuration
+# This is the top-level config file for the pipeline.
+
+# Logging configuration
+LOG_LEVEL: DEBUG
+
+# Paths to sub-configs
+training_config: configs/training_config.yaml
+summary_config: configs/summary_config.yaml
+
+# DATA INPUT AND OUTPUT PATHS
+DIR_DATASET: examples/synthetic/dataset.xlsx
+TRAIN_SHEET: train
+TEST_SHEET: test
+INTERVIEW_SHEET: interview
+DIR_CONTEXT: examples/synthetic/patient_summaries.json
+DIR_JSON_MAP: examples/synthetic/mapping.json
+DIR_OUTPUT: output
+DIR_SUMMARY: input_summary
+
+# DATASET SCHEMA MAPPINGS
+patient_col: Patient
+physician_col: Physician
+item_col: Item
+
+# LABEL SPACE DEFINITION
+classes:
+  - Behavioral health
+  - Diagnoses
+  - Disabilities
+  - Infectious diseases
+  - Genetics
+  - Medications
+  - Sexual and reproductive health
+  - Social determinants of health
+  - Violence
+  - Other
+
+# PREPROCESSING CONTROLS
+fuzzy_threshold: 85
+physician_count: 2
+mismatch_error: false
+same_physicians_survey_interview: true
+
+# EMBEDDING MODEL CONFIGURATION
+llm: emilyalsentzer/Bio_ClinicalBERT
+llm_revision: main
+hf_local_files_only: false
+tokenizer_model_max_length: 512
+pooling: mean
+
+# SUMMARY GENERATION CONTROLS
+ENABLE_SUMMARY: true
+SUMMARY:
+  strict: false
+
+# REPRODUCIBILITY GUARDS
+REPRODUCIBILITY:
+  enforce_pinned_requirements: true
+  python_version: ">=3.10"
+  allow_remote_inputs: false
+  folder_enabled: true
+  folder_path: reproducibility_artifacts
+  artifacts:
+    ensemble_manifest_json: true
+    run_manifest_json: true
+    run_config_yaml: true

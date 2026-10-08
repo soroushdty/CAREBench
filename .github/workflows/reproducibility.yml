@@ -1,0 +1,46 @@
+name: Reproducibility Smoke Gate
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+jobs:
+  reproducibility-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # CPU-only PyTorch wheels keep the CI install small.
+          python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
+          python -m pip install -r requirements-dev.txt
+          python -m pip install -e .
+          python -m pip check
+
+      - name: Install from pyproject.toml only (smoke test)
+        run: |
+          python -m venv --system-site-packages smoke-venv
+          . smoke-venv/bin/activate
+          python -m pip install --no-deps .
+          cd "$RUNNER_TEMP" && python -c "import shared, tracks, adapters"
+
+      - name: Package import smoke
+        run: |
+          python run_smoke_test.py
+
+      - name: Run full test suite (excluding slow)
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          PYTHONHASHSEED: "42"
+        run: |
+          python -m pytest -q --ignore-glob='*slow*' -m 'not slow' tests/

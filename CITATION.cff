@@ -1,0 +1,92 @@
+cff-version: 1.2.0
+message: "If you use CAREBench, please cite it as below, together with the study whose design it builds on."
+title: "CAREBench: a benchmark framework for context-aware classification of sensitive health data"
+type: software
+authors:
+  - family-names: Dianaty
+    given-names: Soroush
+license: Apache-2.0
+version: 0.1.0
+date-released: 2026-10-07
+keywords:
+  - large language models
+  - sensitive health information
+  - data segmentation
+  - clinical context
+  - benchmark
+references:
+  - type: article
+    title: "New Automated Granular Data Segmentation Approach: Context Impacts Categorization by Physicians"
+    status: preprint
+    doi: 10.2196/preprints.66059
+    url: "https://preprints.jmir.org/preprint/66059"
+    year: 2024
+    publisher:
+      name: JMIR Preprints
+    authors:
+      - {family-names: Kaufman, given-names: Hannah Jane}
+      - {family-names: Banerjee, given-names: Ipsha}
+      - {family-names: Wei, given-names: Mengyi}
+      - {family-names: Siddiqui, given-names: Shafaq}
+      - {family-names: Murcko, given-names: Anita}
+      - {family-names: Todd, given-names: Michael}
+      - {family-names: Londoño-Echeverri, given-names: Maria Alejandra}
+      - {family-names: Nagarajan, given-names: Sugandha Kumar}
+      - {family-names: Moreno, given-names: Eider}
+      - {family-names: Radhakrishnan, given-names: Priya}
+      - {family-names: Fuquen, given-names: Pedro Franco}
+      - {family-names: Perumbeti, given-names: Ajay}
+      - {family-names: Kirchoff, given-names: Robert}
+      - {family-names: Rosas, given-names: Jennifer}
+      - {family-names: El-Kareh, given-names: Robert}
+      - {family-names: Vargas-Cely, given-names: Fabio Samir}
+      - {family-names: Johnson, given-names: Joseph}
+      - {family-names: Chang, given-names: Frederick}
+      - {family-names: Ali, given-names: Sanah}
+      - {family-names: Lee, given-names: Daniel}
+      - {family-names: Predun, given-names: William}
+      - {family-names: Lane, given-names: Steven}
+      - {family-names: Norquist, given-names: Craig}
+      - {family-names: Lutgendorf, given-names: Monica A}
+      - {family-names: Kressly, given-names: Susan J}
+      - {family-names: Eldredge, given-names: Christina}
+      - {family-names: Jindani, given-names: Shireen}
+      - {family-names: Lott, given-names: Eric}
+      - {family-names: Martinez, given-names: David Arturo}
+      - {family-names: Abbott, given-names: Brandon}
+      - {family-names: Morris, given-names: Meghan}
+      - {family-names: Grando, given-names: Maria Adela}
+  - type: article
+    title: "Assessing the Effectiveness and Scalability of Fast Healthcare Interoperability Resource-Based Granular Data Segmentation Technology"
+    doi: 10.1055/a-2863-4129
+    journal: Applied Clinical Informatics
+    volume: 17
+    issue: 3
+    start: 423
+    end: 433
+    year: 2026
+    authors:
+      - {family-names: Lee, given-names: Preston}
+      - {family-names: Dhadwal, given-names: Abhishek Singh}
+      - {family-names: Kaiser, given-names: Martha}
+      - {family-names: Dianaty, given-names: Soroush}
+      - {family-names: Lott, given-names: Eric}
+      - {family-names: Singh, given-names: Gagandeep}
+      - {family-names: Chern, given-names: Darwyn}
+      - {family-names: Walonoski, given-names: Jason}
+      - {family-names: Grando, given-names: Adela}
+  - type: conference-paper
+    title: "Early Evidence for Context-Aware Large Language Models (LLMs) in Sensitive Health Data Classification"
+    year: 2026
+    conference:
+      name: AcademyHealth Annual Research Meeting 2026
+      city: Seattle
+      region: WA
+      country: US
+      date-start: 2026-05-30
+      date-end: 2026-06-02
+    authors:
+      - {family-names: Dianaty, given-names: S.}
+      - {family-names: Kaiser, given-names: M.}
+      - {family-names: Murcko, given-names: A.}
+      - {family-names: Grando, given-names: A.}

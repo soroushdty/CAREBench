@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+uv.lock
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Editors and OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Local data and run outputs (never commit real patient data)
+data/
+output/
+log.txt
+*.tmp

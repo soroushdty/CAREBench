@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "carebench"
+version = "0.1.0"
+description = "Benchmark framework for context-aware classification of sensitive health data by language models"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Soroush Dianaty" }]
+requires-python = ">=3.10"
+dependencies = [
+  "numpy==2.0.2",
+  "pandas==2.2.2",
+  "matplotlib==3.10.8",
+  "seaborn==0.13.2",
+  "scipy==1.17.1",
+  "torch==2.10.0",
+  "openpyxl==3.1.5",
+  "joblib==1.5.3",
+  "scikit-learn==1.8.0",
+  "rapidfuzz==3.14.5",
+  "tqdm==4.67.3",
+  "transformers==5.5.3",
+  "sentence-transformers==5.4.0",
+  "requests==2.32.4",
+  "PyYAML==6.0.3"
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["shared*", "tracks*", "adapters*"]
+exclude = ["tests*", "docs*", "data*", "output*"]
+
+[tool.setuptools.data-files]
+"configs" = [
+  "configs/main_config.yaml",
+  "configs/assay_config.yaml",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.4.2",
+  "ruff>=0.4",
+  "nbconvert>=7",
+]
+
+[tool.pytest.ini_options]
+markers = [
+  "slow: long-running integration tests",
+  "e2e: end-to-end validation tests",
+  "smoke: lightweight entry-point tests",
+]

@@ -1,0 +1,60 @@
+# backend: huggingface | dry_run | local_transformers
+backend: local_transformers
+model_ids:
+  - "BioMistral/BioMistral-7B-DARE"
+  - "google/medgemma-1.5-4b-it"
+  - "Qwen/Qwen2.5-14B-Instruct"
+  - "epfl-llm/meditron-7b"
+  - "wanglab/ClinicalCamel-70B"
+  - "microsoft/MediPhi"
+  - "openlm-research/open_llama_13b"
+local_device_map: "auto"       # or "cuda:0"
+local_torch_dtype: "bfloat16"  # bfloat16 | float16 | float32
+local_batch_size: 8            # items per GPU forward pass; reduce if OOM
+
+hf_token_env: HF_TOKEN # env var name; or set hf_token directly
+
+temperature: 0.0
+# Higher budget required for reasoning models (e.g. MedGemma 1.5 emits a
+# pre-answer thinking trace before producing JSON output).
+max_tokens: 4096
+top_p: 1.0
+seed: 42
+retry_limit: 3
+request_timeout: 60
+
+shuffled_context_seed: 123
+bootstrap_seed: 42
+permutation_seed: 42
+
+n_bootstrap_resamples: 1000
+n_permutations: 10000
+
+# Label leakage checking: set to true to skip validation (useful for datasets with known leakage issues)
+skip_label_leakage_check: false
+
+output_dir: output/assay
+cache_dir: output/assay/cache
+scores_dir: output/assay/scores
+reports_dir: output/assay/reports
+
+data:
+  dataset_path: examples/synthetic/dataset.xlsx
+  patient_summaries_path: examples/synthetic/patient_summaries.json
+  train_sheet: train
+  test_sheet: test
+  interview_sheet: interview
+  patient_col: Patient
+  physician_col: Physician
+  item_col: Item
+  classes:
+    - Behavioral health
+    - Diagnoses
+    - Disabilities
+    - Infectious diseases
+    - Genetics
+    - Medications
+    - Sexual and reproductive health
+    - Social determinants of health
+    - Violence
+    - Other

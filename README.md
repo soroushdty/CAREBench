@@ -54,7 +54,9 @@ The primary endpoints are:
 
 The default label space is the ten sensitive-data categories used in the SHARES project: behavioral_health, diagnoses, disabilities, infectious_diseases, genetics, medications, sexual_reproductive_health, social_determinants_of_health, violence, other.
 
-**Scope**: Claims are scoped to the patients and reference observers of the dataset being evaluated. Results are not reported as Brier score, F1, AUROC, or prediction accuracy.
+**Scope**: Claims are scoped to the patients and reference observers of the dataset being evaluated. The endpoints measure context-induced shifts and their agreement with the reference shifts, not classification accuracy. The one exception is Track 1's H2, which tests whether context lowers the Brier score against the correct-context reference labels.
+
+Formal definitions of every endpoint, the unit of analysis, the statistical tests, and the design decisions behind them are in [`docs/methodology.md`](docs/methodology.md).
 
 ## Origins and Acknowledgments
 
@@ -66,6 +68,15 @@ CAREBench grew out of work in Dr. Adela Grando's **SHARES** project at Arizona S
 An early version of this analysis was presented as: Dianaty S, Kaiser M, Murcko A, Grando A. *Early Evidence for Context-Aware Large Language Models (LLMs) in Sensitive Health Data Classification.* AcademyHealth Annual Research Meeting 2026, Seattle, WA, May 30 – Jun 2, 2026.
 
 The study data is not distributed with CAREBench. The bundled example dataset is synthetic.
+
+## Project Status
+
+CAREBench 0.1.0 is an early public release of a research framework, not an established benchmark.
+
+- **Tested:** both tracks run end to end on the bundled synthetic dataset, under CI.
+- **Not yet available:** results on real data, simulation studies of the endpoints' false-positive rate and power ([#18](https://github.com/soroushdty/CAREBench/issues/18)), a second dataset format, and a configurable label taxonomy. Known gaps in the current statistics are listed in [`docs/methodology.md`](docs/methodology.md#known-limitations).
+
+**Development history.** CAREBench began as the analysis code for the study described under [Origins and Acknowledgments](#origins-and-acknowledgments) and was developed in a private repository from January to June 2026 (about 800 commits). It was then generalized into a dataset-agnostic framework. This public repository was created from a sanitized snapshot, so that study data and private development material are not in its git history. A short public commit history does not reflect the age of the code.
 
 ## LLM Context-Shift Assay (Track 3)
 
@@ -221,6 +232,7 @@ Planned work is tracked in [GitHub issues](https://github.com/soroushdty/CAREBen
 - [`docs/running_example.md`](docs/running_example.md) — Commands, outputs, and caveats for the synthetic example
 - [`docs/artifact_contracts.md`](docs/artifact_contracts.md) — Required output artifacts and schemas
 - [`docs/data_model.md`](docs/data_model.md) — Canonical vocabulary and data model
+- [`docs/methodology.md`](docs/methodology.md) — Endpoints, statistical tests, design rationale, and known limitations
 
 ## Project Structure
 

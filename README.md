@@ -4,6 +4,8 @@
 
 It runs any dataset with human reference labels collected under two conditions: first **without** patient context, then **with** a patient's clinical snapshot. It measures how much a model's judgments move when context is added, and whether they move the same way the human judgments did.
 
+The framework is a **functional analogy to physician decision-making**. Each evaluation track stands for one way a physician could reach a context-dependent judgment: drawing on general clinical knowledge (representation), learning from supervised case experience (adaptation), or deliberating over the chart at decision time (reasoning). Comparing the tracks against the physician reference tests which mechanism reproduces the physicians' context shifts. It does not claim to model how physicians think.
+
 > This repository contains code and a fully **synthetic** example dataset only. It does not include data from any human-subjects study.
 
 ## Quickstart
@@ -23,12 +25,18 @@ Outputs go to `output/assay/<run_id>/`. To use your own data, see [`docs/data_fo
 The code is organized into three top-level packages (full tree under [Project Structure](#project-structure)):
 
 - **`shared/`**: dataset-agnostic utilities, preprocessing, statistics, evaluation, and the adapter contracts (`shared/adapters/base.py`).
-- **`tracks/`**: the two evaluation pipelines (Track 1 representation, Track 3 reasoning).
+- **`tracks/`**: the evaluation pipelines: Track 1 representation and Track 3 reasoning. Track 2 (adaptation) is planned ([#13](https://github.com/soroushdty/CAREBench/issues/13)).
 - **`adapters/`**: dataset adapters that translate a dataset into the framework's canonical objects. The built-in `paired_context` adapter serves both tracks.
 
 Dependencies point one way: `tracks/` and `adapters/` import from `shared/`; `shared/` imports from neither, and `adapters/` never imports from `tracks/`. Architecture tests in `tests/architecture/` enforce this.
 
 ### Tracks
+
+| Track | Physician analogue | Question | Status |
+|-------|--------------------|----------|--------|
+| 1 – Representation | General clinical knowledge, before any task-specific training | Is the context shift already latent in pretrained knowledge? | Available |
+| 2 – Adaptation | Learning from supervised case experience (clinical training, feedback on real cases) | Can the shift be learned from labelled cases and carried over to new patients? | Planned ([#13](https://github.com/soroushdty/CAREBench/issues/13)) |
+| 3 – Reasoning | Deliberating over the chart at decision time, without changing what the model knows | Does the shift come from reasoning at decision time? | Available |
 
 - **[Track 1 — Representation](tracks/representation/README.md)** (`tracks/representation/`): Bio-ClinicalBERT embedding pipeline, multilabel classifier, context-aware fusion head, LOPO-CV, and statistical hypothesis analysis (H1–H2).
 - **[Track 3 — Reasoning](tracks/reasoning/README.md)** (`tracks/reasoning/`): LLM context-shift assay pipeline. Runs each EHR item under three conditions (context-free, correct-context, shuffled-context) and tests H1–H4 against physician judgment shifts.
@@ -209,6 +217,10 @@ Planned work is tracked in [GitHub issues](https://github.com/soroushdty/CAREBen
 - **Context perturbation suite**: field-level ablation, irrelevant-context insertion, field reordering, and item paraphrasing for the reasoning track, to test whether context shifts come from clinically relevant content.
 - **TRIPOD-LLM report**: an auto-filled TRIPOD-LLM checklist per run, with links to the supporting artifacts and explicit TODOs for author-only items.
 - **Multi-agent reference emulation**: blind LLM rater pairs with consensus and adjudication, mirroring the paired-physician reference design (aligned with the EviTrace multi-agent roadmap).
+- **Track 2 — Adaptation** ([#13](https://github.com/soroushdty/CAREBench/issues/13)): the analogue of a physician learning from supervised case experience. A model is fine-tuned on labelled (patient context, item) cases from training patients, then evaluated on new patients under the same three conditions as Track 3. A learning curve shows how alignment with physicians grows with the number of patients learned from.
+- **Patient-grouped cross-validation** ([#10](https://github.com/soroushdty/CAREBench/issues/10)): shared, configurable splits (leave-one-patient-out or grouped k-fold) for Tracks 1 and 2.
+- **Shuffled-context condition for Track 1** ([#11](https://github.com/soroushdty/CAREBench/issues/11)): a wrong-patient context control, so Track 1 can test whether the model uses *this* patient's context, as Track 3's H4 does.
+- **Same-model comparison across tracks** ([#12](https://github.com/soroushdty/CAREBench/issues/12)): one model family run frozen, fine-tuned, and prompted, so differences between tracks reflect the mechanism rather than the model.
 - **Configurable label taxonomy**: the reasoning track currently assumes the ten SHARES categories.
 - **Distribution-shift evaluation**: requires a second dataset in the paired-context format.
 - **Other inputs and backends**: FHIR/OMOP ingestion, confidence-weighted or adjudicated reference aggregation, and hosted-API LLM backends.

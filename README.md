@@ -76,7 +76,7 @@ CAREBench 0.1.0 is an early public release of a research framework, not an estab
 - **Tested:** both tracks run end to end on the bundled synthetic dataset, under CI.
 - **Not yet available:** results on real data, simulation studies of the endpoints' false-positive rate and power ([#18](https://github.com/soroushdty/CAREBench/issues/18)), a second dataset format, and a configurable label taxonomy. Known gaps in the current statistics are listed in [`docs/methodology.md`](docs/methodology.md#known-limitations).
 
-**Development history.** CAREBench began as the analysis code for the study described under [Origins and Acknowledgments](#origins-and-acknowledgments) and was developed in a private repository over several months (about 800 commits). It was then generalized into a dataset-agnostic framework. This public repository was created from a sanitized snapshot, so that study data and private development material are not in its git history. A short public commit history does not reflect the age of the code.
+**Development history.** CAREBench began as the analysis code for the study described under [Origins and Acknowledgments](#origins-and-acknowledgments) and was developed in a private repository from January to June 2026 (about 800 commits). It was then generalized into a dataset-agnostic framework. This public repository was created from a sanitized snapshot, so that study data and private development material are not in its git history. A short public commit history does not reflect the age of the code.
 
 ## LLM Context-Shift Assay (Track 3)
 

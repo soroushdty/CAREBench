@@ -1,9 +1,12 @@
 """H1 (Context Sensitivity) hypothesis tests.
 
 Three prespecified inferences per §3.7:
-  1. Per-class exact binomial test (sign agreement rate, BH FDR q=0.05)
+  1. Per-class patient-cluster sign-flip test on sign agreement > 0.5
+     (BH FDR q=0.05); the exact binomial p-value is kept as a descriptive,
+     unclustered reference
   2. Patient-clustered permutation test on aggregate sign agreement
-  3. Cochran-Mantel-Haenszel (CMH) pooled cross-class inference
+  3. Cochran-Mantel-Haenszel (CMH) pooled cross-class inference, with a
+     patient-cluster sign-flip p-value on the same cells
 """
 from __future__ import annotations
 
@@ -14,6 +17,7 @@ import pandas as pd
 from scipy.stats import binomtest
 
 from shared.statistical.bootstrap import bootstrap_rate
+from shared.statistical.cluster_tests import cluster_sign_flip_test
 from shared.statistical.delta import sign_agreement_mask
 
 logger = logging.getLogger(__name__)
@@ -57,18 +61,28 @@ def h1_binomial_per_class(
     patient_ids: np.ndarray,
     n_resamples: int = 1000,
     rng: np.random.Generator | None = None,
+    n_permutations: int = 10_000,
+    perm_rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
-    """Exact binomial test per class on sign agreement rate (§3.7 H1 per-class).
+    """Per-class test of sign agreement rate > 0.5 (§3.7 H1 per-class).
 
     For each class c, restricted to items with Δ_p(i,c) ≠ 0:
       - Compute sign agreement rate (proportion where sign(Δ_m)==sign(Δ_p))
-      - Exact binomial test: H₀: p = 0.5, alternative: greater
+      - Patient-cluster sign-flip test on (agree − 0.5): H₀: rate = 0.5,
+        alternative: greater.  This is the confirmatory p-value (cluster_p).
+      - Exact binomial test with the same hypotheses (binom_p).  It treats
+        cells as independent, so it is reported for reference only.
       - 95% patient-level bootstrap CI on the agreement rate
-    BH FDR correction (q=0.05) applied across confirmatory-eligible classes only.
+    BH FDR correction (q=0.05) on cluster_p, across confirmatory-eligible
+    classes only.
+
+    ``perm_rng`` drives the sign-flip test's Monte Carlo path (unused when the
+    test is exact); it is separate from ``rng`` so that adding the test does
+    not change the bootstrap draws.
 
     Returns a DataFrame with columns:
       Class, n_nonzero, sign_agree_rate, ci_lower, ci_upper,
-      binom_p, bh_adj_p, confirmatory
+      binom_p, cluster_p, bh_adj_p, confirmatory
     """
     dp = np.asarray(delta_p, dtype=np.float32)
     dm = np.asarray(delta_m, dtype=np.float32)
@@ -91,6 +105,7 @@ def h1_binomial_per_class(
                 "ci_lower": float("nan"),
                 "ci_upper": float("nan"),
                 "binom_p": float("nan"),
+                "cluster_p": float("nan"),
                 "bh_adj_p": float("nan"),
                 "confirmatory": cls in eligible_set,
             })
@@ -106,9 +121,13 @@ def h1_binomial_per_class(
         # Patient-level bootstrap CI
         point, ci_lo, ci_hi = bootstrap_rate(agree_1d, pid_nz, n_resamples, rng)
 
-        # Exact binomial test
-        result = binomtest(k, n_nz, p=0.5, alternative="greater")
-        p_val = float(result.pvalue)
+        # Exact binomial test (unclustered; descriptive reference)
+        binom_p = float(binomtest(k, n_nz, p=0.5, alternative="greater").pvalue)
+
+        # Patient-cluster sign-flip test (confirmatory)
+        p_val = cluster_sign_flip_test(
+            agree_1d.astype(float) - 0.5, pid_nz, n_permutations, perm_rng,
+        )
 
         row_idx = len(rows)
         rows.append({
@@ -117,13 +136,15 @@ def h1_binomial_per_class(
             "sign_agree_rate": rate,
             "ci_lower": ci_lo,
             "ci_upper": ci_hi,
-            "binom_p": p_val,
+            "binom_p": binom_p,
+            "cluster_p": p_val,
             "bh_adj_p": float("nan"),  # filled below
             "confirmatory": cls in eligible_set,
         })
 
         if cls in eligible_set:
-            confirmatory_p_values.append(p_val)
+            # Untestable (fewer than two patients) counts as p = 1, as in H2.
+            confirmatory_p_values.append(1.0 if np.isnan(p_val) else p_val)
             confirmatory_indices.append(row_idx)
 
     df = pd.DataFrame(rows)
@@ -246,6 +267,9 @@ def h1_cmh_test(
     delta_m: np.ndarray,
     eligible_classes: list[str],
     class_list: list[str],
+    patient_ids: np.ndarray | None = None,
+    n_permutations: int = 10_000,
+    perm_rng: np.random.Generator | None = None,
 ) -> dict:
     """Class-stratified CMH test for pooled sign-agreement evidence (§3.7 H1 pooled).
 
@@ -269,9 +293,14 @@ def h1_cmh_test(
     are skipped to avoid degenerate tables with a zero row margin.
 
     Combines tables via statsmodels StratifiedTable (common-odds-ratio test).
+    The CMH test counts cells as independent.  When ``patient_ids`` is given,
+    ``p_cluster`` is a patient-cluster sign-flip test of pooled sign
+    agreement > 0.5 over the cells of the included strata; it is the
+    confirmatory counterpart of ``p_cmh``.
 
     Returns dict with keys:
-        common_odds_ratio, ci_lower, ci_upper, chi2_cmh, p_cmh, n_strata
+        common_odds_ratio, ci_lower, ci_upper, chi2_cmh, p_cmh, p_cluster,
+        n_strata
     Falls back to a manual Mantel-Haenszel calculation if statsmodels is
     unavailable.
     """
@@ -280,6 +309,9 @@ def h1_cmh_test(
     eligible_set = set(eligible_classes)
 
     tables: list[np.ndarray] = []
+    pooled_agree: list[np.ndarray] = []
+    pooled_pids: list[np.ndarray] = []
+    pid = np.asarray(patient_ids) if patient_ids is not None else None
     for c_idx, cls in enumerate(class_list):
         if cls not in eligible_set:
             continue
@@ -307,6 +339,11 @@ def h1_cmh_test(
             continue
 
         tables.append(np.array([[a, b], [c, d]], dtype=float))
+        if pid is not None:
+            nz = pos | neg
+            agree = (pos & (dm_col > 0.0)) | (neg & (dm_col <= 0.0))
+            pooled_agree.append(agree[nz].astype(float))
+            pooled_pids.append(pid[nz])
 
     if not tables:
         return {
@@ -315,8 +352,18 @@ def h1_cmh_test(
             "ci_upper": float("nan"),
             "chi2_cmh": float("nan"),
             "p_cmh": float("nan"),
+            "p_cluster": float("nan"),
             "n_strata": 0,
         }
+
+    p_cluster = float("nan")
+    if pid is not None:
+        p_cluster = cluster_sign_flip_test(
+            np.concatenate(pooled_agree) - 0.5,
+            np.concatenate(pooled_pids),
+            n_permutations,
+            perm_rng,
+        )
 
     try:
         from statsmodels.stats.contingency_tables import StratifiedTable
@@ -330,11 +377,12 @@ def h1_cmh_test(
             "ci_upper": float(ci[1]),
             "chi2_cmh": float(summary.statistic),
             "p_cmh": float(summary.pvalue),
+            "p_cluster": p_cluster,
             "n_strata": len(tables),
         }
     except Exception as exc:
         logger.warning("statsmodels StratifiedTable failed (%s); using manual MH.", exc)
-        return _manual_mh(tables)
+        return {**_manual_mh(tables), "p_cluster": p_cluster}
 
 
 def _manual_mh(tables: list[np.ndarray]) -> dict:

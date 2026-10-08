@@ -1,7 +1,9 @@
 """H2 (Contextual Alignment) hypothesis tests.
 
 Two analyses per §3.7:
-  1. Paired per-class Wilcoxon signed-rank test on Brier-score differences
+  1. Paired per-class test of Brier-score improvement: patient-cluster
+     sign-flip test (confirmatory), with the Wilcoxon signed-rank p-value
+     kept as a descriptive, unclustered reference
   2. Per-class Wasserstein distance between prediction and label distributions
 """
 from __future__ import annotations
@@ -13,6 +15,7 @@ import pandas as pd
 from scipy.stats import wasserstein_distance, wilcoxon
 
 from shared.statistical.bootstrap import bootstrap_scalar
+from shared.statistical.cluster_tests import cluster_sign_flip_test
 
 logger = logging.getLogger(__name__)
 
@@ -59,20 +62,29 @@ def h2_wilcoxon_per_class(
     patient_ids: np.ndarray,
     n_resamples: int = 1000,
     rng: np.random.Generator | None = None,
+    n_permutations: int = 10_000,
+    perm_rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
-    """Paired Wilcoxon signed-rank test per class on Brier-score improvement (§3.7 H2).
+    """Paired per-class test of Brier-score improvement (§3.7 H2).
 
     For each class c:
         BS_cf(i,c) = (ŷ_cf(i,c) - y_int(i,c))²
         BS_ca(i,c) = (ŷ_ca(i,c) - y_int(i,c))²
         diff(i,c)  = BS_cf(i,c) - BS_ca(i,c)   (positive = context-aware better)
-    Wilcoxon signed-rank test: H₀: median(diff) = 0, alternative: greater.
-    BH FDR correction (q=0.05) across classes.
+    Patient-cluster sign-flip test on diff: H₀: mean(diff) = 0, alternative:
+    greater.  This is the confirmatory p-value (cluster_p).
+    Wilcoxon signed-rank test (wilcoxon_p) treats items as independent and is
+    reported for reference only.
+    BH FDR correction (q=0.05) on cluster_p across classes.
     95% patient-level bootstrap CI on (BS_cf - BS_ca) mean improvement.
+
+    ``perm_rng`` drives the sign-flip test's Monte Carlo path (unused when the
+    test is exact); it is separate from ``rng`` so that adding the test does
+    not change the bootstrap draws.
 
     Returns DataFrame with columns:
         Class, BS_cf, BS_ca, improvement, ci_lower, ci_upper,
-        wilcoxon_stat, wilcoxon_p, bh_adj_p
+        wilcoxon_stat, wilcoxon_p, cluster_p, bh_adj_p
     """
     cf = np.asarray(y_hat_cf, dtype=np.float64)
     ca = np.asarray(y_hat_ca, dtype=np.float64)
@@ -105,6 +117,9 @@ def h2_wilcoxon_per_class(
                 logger.warning("Wilcoxon failed for class %s: %s", cls, exc)
                 stat, p = float("nan"), float("nan")
 
+        # Patient-cluster sign-flip test (confirmatory)
+        cluster_p = cluster_sign_flip_test(diff, pid, n_permutations, perm_rng)
+
         rows.append({
             "Class": cls,
             "BS_cf": bs_cf_mean,
@@ -114,9 +129,10 @@ def h2_wilcoxon_per_class(
             "ci_upper": ci_hi,
             "wilcoxon_stat": stat,
             "wilcoxon_p": p,
+            "cluster_p": cluster_p,
             "bh_adj_p": float("nan"),
         })
-        raw_p.append(p if not np.isnan(p) else 1.0)
+        raw_p.append(cluster_p if not np.isnan(cluster_p) else 1.0)
 
     df = pd.DataFrame(rows)
     if raw_p:

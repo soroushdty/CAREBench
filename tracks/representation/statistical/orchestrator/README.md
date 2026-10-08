@@ -94,10 +94,12 @@ strings with a warning if the mapping file is unavailable or the build fails.
 
 Calls `shared.statistical.icc.load_individual_physician_labels()`. Used in Steps 9 and 14.
 
-### Step 4 — H1 per-class binomial test
+### Step 4 — H1 per-class sign-agreement test
 
-Calls `tracks.representation.statistical.hypotheses.h1.h1_binomial_per_class`. Restricted to confirmatory-eligible classes
-for BH FDR correction; all classes are reported with their `confirmatory` flag.
+Calls `tracks.representation.statistical.hypotheses.h1.h1_binomial_per_class`. The confirmatory p-value (`cluster_p`) is a
+patient-cluster sign-flip test of sign agreement > 0.5; the exact binomial p-value (`binom_p`) treats cells as independent
+and is kept for reference only. BH FDR correction is applied to `cluster_p` across confirmatory-eligible classes; all
+classes are reported with their `confirmatory` flag.
 
 **Output:** `h1_per_class.csv`
 
@@ -113,15 +115,17 @@ each patient block, pooled across confirmatory-eligible classes.
 
 Calls `tracks.representation.statistical.hypotheses.h1.h1_cmh_test`. Builds one 2×2 table per confirmatory-eligible class
 (stratified by physician-delta direction) and combines them via the Mantel-Haenszel
-common-odds-ratio statistic.
+common-odds-ratio statistic. `p_cluster` is a patient-cluster sign-flip test of pooled sign agreement > 0.5 on the same
+cells; `p_cmh` treats cells as independent and is kept for reference only.
 
 **Output:** `h1_cmh.json`
 
 ### Step 7 — H2 Wilcoxon Brier and macro summary
 
-Calls `tracks.representation.statistical.hypotheses.h2.h2_wilcoxon_per_class` then `h2_macro_summary`. The Wilcoxon test
-uses `alternative="greater"` to test whether context-aware Brier scores are lower. BH FDR
-correction is applied across all classes.
+Calls `tracks.representation.statistical.hypotheses.h2.h2_wilcoxon_per_class` then `h2_macro_summary`. The confirmatory
+p-value (`cluster_p`) is a one-sided patient-cluster sign-flip test of whether context-aware Brier scores are lower; the
+Wilcoxon signed-rank p-value (`wilcoxon_p`) treats items as independent and is kept for reference only. BH FDR
+correction is applied to `cluster_p` across all classes.
 
 **Outputs:** `h2_brier.csv`, `h2_brier_summary.json`
 
@@ -202,7 +206,7 @@ failure does not abort the pipeline.
 | `h1_per_class.csv`      | H1 sign agreement, BH-adjusted p              |
 | `h1_aggregate.json`     | H1 permutation test result                    |
 | `h1_cmh.json`           | H1 CMH common odds ratio                      |
-| `h2_brier.csv`          | H2 Wilcoxon Brier improvement per class       |
+| `h2_brier.csv`          | H2 Brier improvement per class                |
 | `h2_brier_summary.json` | H2 macro-average Brier summary                |
 | `h2_wasserstein.csv`    | H2 Wasserstein-1 distance per class           |
 | `icc_results.csv`       | Per-pair ICC(2,1) and CCC values              |

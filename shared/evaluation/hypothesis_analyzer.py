@@ -2,7 +2,7 @@
 Hypothesis Analyzer for the LLM Context-Shift Assay.
 
 Computes H1–H4 statistical endpoints with patient-cluster bootstrap CIs
-and permutation test p-values.
+and permutation test p-values (H4: patient-cluster sign-flip test).
 
 Reuses ``shared.statistical.bootstrap.patient_block_bootstrap`` for
 all bootstrap confidence intervals.
@@ -29,6 +29,7 @@ import numpy as np
 import scipy.stats
 
 from shared.statistical.bootstrap import patient_block_bootstrap
+from shared.statistical.cluster_tests import cluster_sign_flip_test
 
 logger = logging.getLogger(__name__)
 
@@ -152,11 +153,14 @@ def permutation_test_h4(
     n_permutations: int = 10_000,
     rng: np.random.Generator | None = None,
 ) -> float:
-    """Paired permutation test for H4 (correct vs shuffled alignment).
+    """Patient-cluster sign-flip test for H4 (correct vs shuffled alignment).
 
-    For each permutation, randomly swaps ``align_correct[i]`` and
-    ``align_shuffled[i]`` within each patient cluster (context_entity_id)
-    with probability 0.5, then recomputes the mean difference.
+    Under the null, correct and shuffled context are exchangeable for a
+    patient, so the sign of each patient's summed difference
+    ``align_correct - align_shuffled`` can be flipped.  All of a patient's
+    cells (context_entity_id) are flipped together, which preserves
+    within-patient correlation.  Exact when ``2 ** n_patients <=
+    n_permutations``; see ``shared.statistical.cluster_tests``.
 
     Parameters
     ----------
@@ -169,47 +173,24 @@ def permutation_test_h4(
     patient_ids:
         1-D array of context_entity_id values parallel to ``align_correct``.
     n_permutations:
-        Number of permutations (default 10 000).
+        Monte Carlo replicates when exact enumeration is too large
+        (default 10 000).
     rng:
-        Optional ``numpy.random.Generator``; created fresh if ``None``.
+        Optional ``numpy.random.Generator`` for the Monte Carlo path.
 
     Returns
     -------
     float
-        p-value = fraction of permuted mean differences ≥ observed mean diff.
+        One-sided p-value for mean(correct - shuffled) > 0.
     """
-    if rng is None:
-        rng = np.random.default_rng()
-
     align_correct = np.asarray(align_correct, dtype=float)
     align_shuffled = np.asarray(align_shuffled, dtype=float)
-    patient_ids = np.asarray(patient_ids)
-
-    observed_diff = float(np.mean(align_correct - align_shuffled))
-
-    unique_pts = np.unique(patient_ids)
-    # Pre-compute per-patient index arrays
-    pt_to_ix: dict[Any, np.ndarray] = {
-        pt: np.where(patient_ids == pt)[0] for pt in unique_pts
-    }
-
-    permuted_diffs = np.empty(n_permutations, dtype=float)
-    for i in range(n_permutations):
-        perm_correct = align_correct.copy()
-        perm_shuffled = align_shuffled.copy()
-        for pt in unique_pts:
-            ix = pt_to_ix[pt]
-            # Flip each pair within the cluster independently with p=0.5
-            flip_mask = rng.random(len(ix)) < 0.5
-            flip_ix = ix[flip_mask]
-            perm_correct[flip_ix], perm_shuffled[flip_ix] = (
-                perm_shuffled[flip_ix].copy(),
-                perm_correct[flip_ix].copy(),
-            )
-        permuted_diffs[i] = float(np.mean(perm_correct - perm_shuffled))
-
-    p_value = float(np.mean(permuted_diffs >= observed_diff))
-    return p_value
+    return cluster_sign_flip_test(
+        align_correct - align_shuffled,
+        np.asarray(patient_ids),
+        n_permutations=n_permutations,
+        rng=rng,
+    )
 
 
 # ---------------------------------------------------------------------------

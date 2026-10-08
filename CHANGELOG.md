@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **P-values now respect clustering by patient** (#16). A new patient-cluster sign-flip test (`shared/statistical/cluster_tests.py`) flips each patient's cells together and is exact when there are few patients.
+  - Track 3 H4: `permutation_test_h4` used to flip each cell independently, which ignored clustering. It now uses the cluster test. The output keys are unchanged.
+  - Track 1 H1 per class and H2: new `cluster_p` column, now the confirmatory p-value; `bh_adj_p` and `n_classes_significant` are computed from it. `binom_p` and `wilcoxon_p` are kept for reference.
+  - Track 1 CMH: new `p_cluster` key.
+  - With exact enumeration the smallest attainable p-value is `2^-(number of patients)`; see `docs/methodology.md`.
+
 ## 0.1.0 — 2026-10-07
 
 Initial public release.

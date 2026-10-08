@@ -246,7 +246,10 @@ class ReportGenerator:
             "(context_entity_id) with replacement "
             "to respect within-patient correlation. Permutation tests use 10 000 "
             "permutations. P-values are one-sided (fraction of permuted statistics "
-            "≥ observed statistic).\n\n"
+            "≥ observed statistic). The H4 test is a patient-cluster sign-flip test: "
+            "each patient's cells are flipped together, and with few patients all "
+            "sign patterns are enumerated, so the smallest attainable p-value is "
+            "2^−(number of patients).\n\n"
             "This report does **not** include Brier score, F1, AUROC, or any measure "
             "of prediction accuracy. The endpoints are context sensitivity, "
             "directional alignment, class-level correspondence, and correct-versus-"
@@ -395,7 +398,7 @@ class ReportGenerator:
             "(restricted to cells where delta_reference ≠ 0).\n",
             f"- **Mean alignment difference (correct − shuffled):** {mean_diff}  ",
             f"- **95% CI:** {ci}  ",
-            f"- **Paired permutation p-value:** {p_val}",
+            f"- **Patient-cluster sign-flip p-value:** {p_val}",
         ]
 
         return "\n".join(lines)

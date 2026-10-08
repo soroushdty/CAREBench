@@ -216,7 +216,6 @@ Three YAML files control the Stage-1/Stage-2 pipeline:
 
 Planned work is tracked in [GitHub issues](https://github.com/soroushdty/CAREBench/issues). None of it is available yet:
 
-- **Unified Track 1 entry point**: route `tracks/representation/runner.py` through `RepresentationTrack` and the dataset adapter, so Track 1 runs from the same adapter as Track 3.
 - **Context perturbation suite**: field-level ablation, irrelevant-context insertion, field reordering, and item paraphrasing for the reasoning track, to test whether context shifts come from clinically relevant content.
 - **TRIPOD-LLM report**: an auto-filled TRIPOD-LLM checklist per run, with links to the supporting artifacts and explicit TODOs for author-only items.
 - **Multi-agent reference emulation**: blind LLM rater pairs with consensus and adjudication, mirroring the paired-physician reference design (aligned with the EviTrace multi-agent roadmap).

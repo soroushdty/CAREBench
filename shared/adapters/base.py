@@ -167,10 +167,20 @@ class RepresentationDataset:
         Reference context-free labels for test data.
     Y_test_correct_context : np.ndarray | None
         Reference correct-context labels for test data.
-    context_vectors : dict[str, np.ndarray] | None
-        Context vectors keyed by context entity ID (for Stage 2).
+    unresolved_mask_train : np.ndarray | None
+        Boolean mask parallel to X_train; True where the item was not
+        resolved by the item-standardization mapping.
+    unresolved_mask_test : np.ndarray | None
+        Boolean mask parallel to X_test, as above.
+    embedding_cache : dict[str, np.ndarray] | None
+        Item string -> embedding for every item in train and test.
+    context_vectors : dict[Any, np.ndarray] | None
+        Precomputed context vectors keyed by context entity ID (for Stage 2).
+    context_records : dict[str, Any] | None
+        Raw per-entity context records keyed by context entity ID; strategies
+        that need context vectors build them from these.
     metadata : dict[str, Any]
-        Additional metadata (embedding model, config snapshot, etc.).
+        Additional metadata (dataset path, sheet names, label space, etc.).
     """
 
     # Required
@@ -187,7 +197,11 @@ class RepresentationDataset:
     item_strings_test: np.ndarray | None = None
     Y_test_context_free: np.ndarray | None = None
     Y_test_correct_context: np.ndarray | None = None
-    context_vectors: dict[str, np.ndarray] | None = None
+    unresolved_mask_train: np.ndarray | None = None
+    unresolved_mask_test: np.ndarray | None = None
+    embedding_cache: dict[str, np.ndarray] | None = None
+    context_vectors: dict[Any, np.ndarray] | None = None
+    context_records: dict[str, Any] | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

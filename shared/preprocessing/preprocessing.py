@@ -54,6 +54,7 @@ def preprocessing(
     sheet_names: Iterable[str] | None = None,
     *,
     enforce_raw_test_eval_equality: bool | None = None,
+    dfs: Mapping[str, pd.DataFrame] | None = None,
 ) -> PreprocessingResult:
     """Run preprocessing pipeline and return a PreprocessingResult.
 
@@ -75,9 +76,12 @@ def preprocessing(
 
     No I/O is performed here. The caller (run()) is responsible for writing
     the index-map JSON and generating summary artifacts.
+
+    ``dfs`` supplies already-loaded sheets keyed by sheet name (for example,
+    from a dataset adapter). When omitted, the sheets are read from
+    ``cfg['DIR_DATASET']``.
     """
 
-    dataset_path = _resolve_input_path(cfg)
     (
         train_sheet_name,
         test_sheet_name,
@@ -85,7 +89,14 @@ def preprocessing(
         selected_sheets,
     ) = _resolve_split_sheet_names(cfg, sheet_names)
 
-    dfs = _read_dataset(dataset_path, selected_sheets, cfg=cfg)
+    if dfs is None:
+        dfs = _read_dataset(_resolve_input_path(cfg), selected_sheets, cfg=cfg)
+    else:
+        missing_sheets = [name for name in selected_sheets if name not in dfs]
+        if missing_sheets:
+            raise ValueError(
+                f"Pre-loaded sheets are missing: {', '.join(missing_sheets)}."
+            )
     summary_enabled = bool(cfg.get("ENABLE_SUMMARY", False))
 
     item_col = cfg["item_col"]
@@ -443,6 +454,7 @@ def preprocess(
     sheet_names: Iterable[str] | None = None,
     *,
     enforce_raw_test_eval_equality: bool | None = None,
+    dfs: Mapping[str, pd.DataFrame] | None = None,
 ) -> pd.DataFrame:
     """Run the full preprocessing pipeline and return the combined DataFrame.
 
@@ -451,11 +463,14 @@ def preprocess(
     carry additional ``{col}_interview`` columns from the LEFT-OUTER-JOIN with
     the interview sheet.
 
+    ``dfs`` is forwarded to :func:`preprocessing` (pre-loaded sheets).
+
     The old 4-tuple payload ``((X_train, y_train), …, context)`` is gone.
     """
     result = preprocessing(
         cfg, sheet_names=sheet_names,
         enforce_raw_test_eval_equality=enforce_raw_test_eval_equality,
+        dfs=dfs,
     )
 
     save_index_mapping_outputs(cfg=cfg, split_index_maps=result.split_index_maps)

@@ -89,12 +89,20 @@ class TestPairedContextRepresentationSmoke:
 
     @pytest.fixture
     def config(self, dataset_path: Path, tmp_path: Path) -> dict[str, Any]:
-        """Build minimal config for paired-context adapter."""
-        return {
-            "dataset_path": str(dataset_path),
-            "output_dir": str(tmp_path / "output"),
-            "stage2_enabled": False,
-        }
+        """Build a Track 1 config for the example dataset, without summaries."""
+        import yaml
+
+        cfg = yaml.safe_load(Path("configs/main_config.yaml").read_text(encoding="utf-8"))
+        cfg.update(
+            {
+                "PROJECT_ROOT": str(Path.cwd()),
+                "DIR_DATASET": str(dataset_path),
+                "ENABLE_SUMMARY": False,
+                "DIR_SUMMARY": str(tmp_path / "input_summary"),
+                "output_dir": str(tmp_path / "output"),
+            }
+        )
+        return cfg
 
     def test_paired_context_adapter_builds_arrays(self, config: dict[str, Any]):
         """Adapter produces valid arrays."""

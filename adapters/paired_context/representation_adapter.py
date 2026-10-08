@@ -1,8 +1,14 @@
 """Paired-context representation adapter — full Track 1 dataset loading.
 
-Loads a paired-context dataset and constructs a
-``RepresentationDataset`` with all fields populated: embeddings, labels,
-train/test splits, optional context vectors for Stage 2.
+Loads a paired-context dataset and constructs a ``RepresentationDataset``
+with all fields populated: embeddings, labels, train/test splits, the
+item-standardization state needed for fuzzy fallback, and the per-entity
+context records used by Stage 2.
+
+Workbook sheets are read through ``PairedContextDatasetAdapter`` and context
+records through ``PairedContextContextAdapter`` — the same loaders the
+reasoning track uses — and then run through the shared preprocessing pipeline
+(item standardization, reference-observer aggregation, summaries).
 
 This module MAY know dataset sheet names, columns, and patient-summary shapes.
 The Track 1 framework (``framework.py``) does NOT import this module.
@@ -33,11 +39,16 @@ class PairedContextRepresentationAdapter:
     Uses
     ----
     - ``adapters.paired_context.column_map.PairedContextColumnMap`` for column constants
-    - ``adapters.paired_context.labels`` for output dimension ordering
     - ``adapters.paired_context.dataset_adapter.PairedContextDatasetAdapter`` for workbook loading
+    - ``adapters.paired_context.context_adapter.PairedContextContextAdapter`` for context records
+    - ``shared.preprocessing.preprocessing.preprocess`` for standardization and aggregation
     - ``shared.embeddings.compute_embeddings`` for embedding computation
-    - ``adapters.paired_context.context_adapter.PairedContextContextAdapter`` for Stage 2 context
     """
+
+    @property
+    def name(self) -> str:
+        """Human-readable adapter name."""
+        return "paired_context_representation"
 
     def load_representation_dataset(
         self, config: dict[str, Any]
@@ -47,16 +58,19 @@ class PairedContextRepresentationAdapter:
         Parameters
         ----------
         config : dict[str, Any]
-            Pipeline configuration. Expected keys:
-            - ``dataset_path``: path to the workbook Excel file
-            - ``patient_summaries_path`` (required when ``stage2_enabled``):
-              path to patient_summaries.json
-            - ``classes`` (optional): output-dimension column names; defaults
-              to the default label space display names
-            - ``patient_col`` / ``physician_col`` / ``item_col`` and sheet
-              names (optional): see ``PairedContextColumnMap.from_config``
-            - ``embedding_model`` (optional): embedding model name
-            - ``stage2_enabled`` (optional): whether to build context vectors
+            Resolved Track 1 configuration (``main_config.yaml`` merged with
+            the training and summary configs). Keys read:
+
+            - ``DIR_DATASET``, ``TRAIN_SHEET``, ``TEST_SHEET``,
+              ``INTERVIEW_SHEET``: workbook path and sheet names
+            - ``patient_col``, ``physician_col``, ``item_col``,
+              ``physician_count``: see ``PairedContextColumnMap.from_config``
+            - ``classes``: output-dimension column names
+            - ``llm``, ``batch_size``: item embedding model and batch size
+            - ``DIR_CONTEXT`` (optional): patient summaries JSON for Stage 2
+            - ``PROJECT_ROOT`` (optional): base for relative paths
+            - plus every key the shared preprocessing pipeline reads
+              (``DIR_JSON_MAP``, ``ENABLE_SUMMARY``, ``DIR_SUMMARY``, ...)
 
         Returns
         -------
@@ -66,53 +80,76 @@ class PairedContextRepresentationAdapter:
         from adapters.paired_context.column_map import PairedContextColumnMap
         from adapters.paired_context.dataset_adapter import PairedContextDatasetAdapter
         from adapters.paired_context import labels as paired_context_labels
+        from shared.embeddings.compute_embeddings import compute_embeddings
+        from shared.preprocessing.preprocessing import preprocess
 
-        import pandas as pd
+        project_root = Path(config.get("PROJECT_ROOT", ".")).resolve()
+        dataset_path = _resolve(project_root, config["DIR_DATASET"])
+        output_dimensions = list(config["classes"])
+        column_map = PairedContextColumnMap.from_config(
+            {
+                "patient_col": config.get("patient_col"),
+                "physician_col": config.get("physician_col"),
+                "item_col": config.get("item_col"),
+                "train_sheet": config.get("TRAIN_SHEET"),
+                "test_sheet": config.get("TEST_SHEET"),
+                "interview_sheet": config.get("INTERVIEW_SHEET"),
+                "physician_count": config.get("physician_count"),
+            }
+        )
 
-        # --- Resolve paths and config ---
-        dataset_path = Path(config["dataset_path"])
-        column_map = PairedContextColumnMap.from_config(config)
-        output_dimensions = list(config.get("classes") or paired_context_labels.display_names())
+        # --- Context records (Stage 2) ---
+        context_records = self._load_context_records(config, project_root)
 
-        # --- Load and aggregate dataset ---
-        adapter = PairedContextDatasetAdapter(
+        # --- Load sheets and preprocess ---
+        sheets = PairedContextDatasetAdapter(
             dataset_path=dataset_path,
             class_cols=output_dimensions,
             column_map=column_map,
-        )
-        train_df, context_free_agg, correct_context_agg = adapter.load_and_aggregate()
+        ).load_sheets()
 
-        # --- Build item strings ---
+        logger.info("Starting preprocessing...")
+        df = preprocess(config, dfs=sheets)
+
+        # --- Embeddings ---
         item_col = column_map.task_instance_col
         patient_col = column_map.context_entity_col
 
-        item_strings_train = train_df[item_col].values.astype(str)
-        item_strings_test = context_free_agg[item_col].values.astype(str)
-
-        # --- Build patient IDs ---
-        patient_ids_train = train_df[patient_col].values.astype(str)
-        patient_ids_test = context_free_agg[patient_col].values.astype(str)
-
-        # --- Build label matrices ---
-        Y_train = train_df[output_dimensions].values.astype(np.float32)
-        Y_test_context_free = context_free_agg[output_dimensions].values.astype(
-            np.float32
-        )
-        Y_test_correct_context = correct_context_agg[output_dimensions].values.astype(
-            np.float32
-        )
-        # Default Y_test uses context-free labels (consistent with existing pipeline)
-        Y_test = Y_test_context_free.copy()
-
-        # --- Build embeddings ---
-        X_train, X_test = self._build_embeddings(
-            item_strings_train, item_strings_test, config
+        logger.info("Computing embeddings with model: %s", config["llm"])
+        embedding_map = compute_embeddings(
+            config["llm"],
+            data=df[item_col],
+            schema="pandas",
+            batch_size=config.get("batch_size", 32),
+            cfg=config,
         )
 
-        # --- Optionally build context vectors for Stage 2 ---
-        context_vectors: dict[str, np.ndarray] | None = None
-        if config.get("stage2_enabled", False):
-            context_vectors = self._build_context_vectors(config, patient_ids_test)
+        # --- Build arrays ---
+        context_free_cols = [
+            f"{c}{column_map.context_free_suffix}" for c in output_dimensions
+        ]
+        correct_context_cols = [
+            f"{c}{column_map.correct_context_suffix}" for c in output_dimensions
+        ]
+
+        train_df = df[df["split"] == "train"].reset_index(drop=True)
+        test_df = df[df["split"] == "test"].reset_index(drop=True)
+
+        X_train = np.vstack(
+            [embedding_map[item.casefold()] for item in train_df[item_col]]
+        )
+        X_test = np.vstack(
+            [embedding_map[item.casefold()] for item in test_df[item_col]]
+        )
+
+        Y_train = train_df[context_free_cols].to_numpy(dtype=np.float32)
+        Y_test = test_df[context_free_cols].to_numpy(dtype=np.float32)
+        Y_test_context_free = (
+            test_df[context_free_cols].to_numpy(dtype=np.float64).astype(np.float32)
+        )
+        Y_test_correct_context = (
+            test_df[correct_context_cols].to_numpy(dtype=np.float64).astype(np.float32)
+        )
 
         logger.info(
             "Paired-context dataset loaded: X_train=%s, X_test=%s, %d output dimensions",
@@ -124,19 +161,27 @@ class PairedContextRepresentationAdapter:
         return RepresentationDataset(
             X_train=X_train,
             Y_train=Y_train,
-            patient_ids_train=patient_ids_train,
+            patient_ids_train=train_df[patient_col].to_numpy(),
             X_test=X_test,
             Y_test=Y_test,
-            patient_ids_test=patient_ids_test,
+            patient_ids_test=test_df[patient_col].to_numpy(),
             output_dimensions=output_dimensions,
-            item_strings_train=item_strings_train,
-            item_strings_test=item_strings_test,
+            item_strings_train=train_df[item_col].to_numpy(),
+            item_strings_test=test_df[item_col].to_numpy(),
             Y_test_context_free=Y_test_context_free,
             Y_test_correct_context=Y_test_correct_context,
-            context_vectors=context_vectors,
+            unresolved_mask_train=(~train_df["item_json_resolved"]).to_numpy(),
+            unresolved_mask_test=(~test_df["item_json_resolved"]).to_numpy(),
+            embedding_cache=embedding_map,
+            context_records=context_records,
             metadata={
-                "adapter": "paired_context_representation",
+                "adapter": self.name,
                 "dataset_path": str(dataset_path),
+                "sheet_names": {
+                    "train": column_map.train_sheet,
+                    "test": column_map.context_free_sheet,
+                    "interview": column_map.correct_context_sheet,
+                },
                 "label_space": {
                     paired_context_labels.normalize_output_dimension(name): name
                     for name in output_dimensions
@@ -148,108 +193,28 @@ class PairedContextRepresentationAdapter:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _build_embeddings(
-        self,
-        item_strings_train: np.ndarray,
-        item_strings_test: np.ndarray,
-        config: dict[str, Any],
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Compute or load embeddings for train and test item strings.
-
-        Uses the shared embedding utility when available. Falls back to
-        loading precomputed embeddings from config paths.
-        """
-        # Check for precomputed embedding paths first
-        train_emb_path = config.get("embeddings_train_path")
-        test_emb_path = config.get("embeddings_test_path")
-
-        if train_emb_path and test_emb_path:
-            logger.info("Loading precomputed embeddings from paths...")
-            X_train = np.load(train_emb_path).astype(np.float32)
-            X_test = np.load(test_emb_path).astype(np.float32)
-            return X_train, X_test
-
-        # Fall back to computing embeddings via shared utility
-        from shared.embeddings.compute_embeddings import compute_embeddings
-
-        all_strings = np.concatenate([item_strings_train, item_strings_test])
-        unique_strings = list(set(all_strings.tolist()))
-
-        embedding_model = config.get("embedding_model", "all-MiniLM-L6-v2")
-        logger.info(
-            "Computing embeddings for %d unique items with model=%s",
-            len(unique_strings),
-            embedding_model,
-        )
-
-        import pandas as pd
-
-        # compute_embeddings keys its result by the stripped string.
-        embeddings_dict = compute_embeddings(
-            embedding_model, pd.Series(unique_strings), schema="pandas", cfg=config
-        )
-
-        X_train = np.array(
-            [embeddings_dict[s.strip()] for s in item_strings_train.tolist()],
-            dtype=np.float32,
-        )
-        X_test = np.array(
-            [embeddings_dict[s.strip()] for s in item_strings_test.tolist()],
-            dtype=np.float32,
-        )
-        return X_train, X_test
-
-    def _build_context_vectors(
-        self,
-        config: dict[str, Any],
-        patient_ids_test: np.ndarray,
-    ) -> dict[str, np.ndarray]:
-        """Build context vectors for Stage 2 fusion.
-
-        Uses the paired-context context adapter to load patient summaries and
-        build context vector representations.
-        """
+    @staticmethod
+    def _load_context_records(
+        config: dict[str, Any], project_root: Path
+    ) -> dict[str, Any] | None:
+        """Load per-entity context records, or None when Stage 2 has no context."""
         from adapters.paired_context.context_adapter import PairedContextContextAdapter
 
-        summaries_path = config["patient_summaries_path"]
-        context_adapter = PairedContextContextAdapter(summaries_path=summaries_path)
+        if not config.get("DIR_CONTEXT"):
+            return None
+        summaries_path = _resolve(project_root, config["DIR_CONTEXT"])
+        if not summaries_path.exists():
+            logger.warning(
+                "DIR_CONTEXT path not found: %s — Stage 2 fusion disabled.",
+                summaries_path,
+            )
+            return None
+        return PairedContextContextAdapter(
+            summaries_path=summaries_path
+        ).load_context_records()
 
-        # Load context records for all test patients
-        unique_patients = list(set(patient_ids_test.tolist()))
-        context_vectors: dict[str, np.ndarray] = {}
 
-        # Check for precomputed context vectors
-        context_vectors_path = config.get("context_vectors_path")
-        if context_vectors_path:
-            import json
-
-            with open(context_vectors_path, "r") as f:
-                raw = json.load(f)
-            for pid, vec in raw.items():
-                context_vectors[str(pid)] = np.array(vec, dtype=np.float32)
-            return context_vectors
-
-        # Build context vectors from patient summaries using embeddings
-        import pandas as pd
-
-        from shared.embeddings.compute_embeddings import compute_embeddings
-
-        embedding_model = config.get("embedding_model", "all-MiniLM-L6-v2")
-
-        for pid in unique_patients:
-            try:
-                record = context_adapter.get_record(str(pid))
-                context_text = context_adapter.format_context(record)
-                emb = compute_embeddings(
-                    embedding_model, pd.Series([context_text]), schema="pandas", cfg=config
-                )
-                context_vectors[str(pid)] = np.array(
-                    emb[context_text.strip()], dtype=np.float32
-                )
-            except KeyError:
-                logger.warning(
-                    "No context record for patient %s; skipping context vector.",
-                    pid,
-                )
-
-        return context_vectors
+def _resolve(project_root: Path, raw_path: Any) -> Path:
+    """Resolve a config path against the project root."""
+    path = Path(raw_path).expanduser()
+    return path if path.is_absolute() else project_root / path

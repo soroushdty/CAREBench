@@ -69,7 +69,7 @@ def test_wilcoxon_bh_adj_monotone():
     pids = _patient_ids()
     df = h2_wilcoxon_per_class(y_cf, y_ca, y_int, CLASSES, pids, n_resamples=50,
                                rng=np.random.default_rng(7))
-    raw = df["wilcoxon_p"].values
+    raw = df["cluster_p"].values  # BH is applied to the cluster p-value (#16)
     adj = df["bh_adj_p"].values
     # Each adjusted p >= raw p (BH cannot shrink p-values)
     for r, a in zip(raw, adj):

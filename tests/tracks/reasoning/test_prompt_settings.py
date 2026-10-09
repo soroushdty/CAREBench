@@ -12,7 +12,7 @@ from shared.evaluation.report_generator import ReportGenerator
 from tracks.reasoning.bundle.report import generate_markdown_report
 from tracks.reasoning.config_loader import ConfigError, validate_prompt_config
 from tracks.reasoning.prompt_template import DEFAULT_INTRO, PromptTemplate
-from tracks.reasoning.run_assay import main
+from tracks.reasoning.run_reasoning import main
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _INTRO = "You are a clinical documentation expert. Classify the following EHR item into note sections."
@@ -109,7 +109,7 @@ def test_bundle_report_uses_category_type(tmp_path):
 
 def _run_dry(tmp_path: Path, monkeypatch, prompt_cfg: dict | None) -> int:
     monkeypatch.chdir(_REPO_ROOT)
-    with open(_REPO_ROOT / "configs" / "assay_config.yaml") as fh:
+    with open(_REPO_ROOT / "configs" / "reasoning_config.yaml") as fh:
         cfg = yaml.safe_load(fh)
     cfg["output_dir"] = str(tmp_path / "output")
     cfg["cache_dir"] = str(tmp_path / "cache")

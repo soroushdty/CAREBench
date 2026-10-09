@@ -2,7 +2,7 @@
 Tests for tracks/reasoning/context_builder.py.
 
 Run with:
-    pytest tests/test_llm_context_shift_assay/test_context_builder.py --noconftest
+    pytest tests/tracks/reasoning/test_context_builder.py --noconftest
 """
 
 from __future__ import annotations

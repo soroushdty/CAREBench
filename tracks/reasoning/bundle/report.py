@@ -142,7 +142,7 @@ def generate_markdown_report(
     categories:
         Canonical category names for per-category tables.
     category_type:
-        Word placed before "categories" in the report text (the assay
+        Word placed before "categories" in the report text (the reasoning
         config's ``prompt.category_type``; ``""`` for none).
     """
     category_type = category_type.strip()
@@ -455,7 +455,7 @@ def _section_limitations() -> str:
         "## Limitations\n\n"
         "1. **Small cohort.** Results are scoped to the patients and physicians in this dataset. "
         "Generalisability to broader populations is unknown.\n"
-        "2. **No prediction accuracy claims.** This assay measures context sensitivity and "
+        "2. **No prediction accuracy claims.** Track 3 measures context sensitivity and "
         "directional alignment only. It does not evaluate classification performance.\n"
         "3. **Bootstrap CI validity.** Patient-cluster bootstrap CIs assume exchangeability of "
         "patient clusters. With small patient counts, bootstrap distributions may be coarse.\n"

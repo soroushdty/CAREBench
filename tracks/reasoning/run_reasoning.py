@@ -1,5 +1,5 @@
 """
-Assay Runner CLI for the LLM Context-Shift Assay.
+Track 3 (reasoning) runner CLI.
 
 Entry point:
 
@@ -65,9 +65,9 @@ from shared.prerequisites.logging_config import logging_config
 
 _CONDITIONS = ("context_free", "correct_context", "shuffled_context")
 
-_DEFAULT_CONFIG_PATH = "configs/assay_config.yaml"
+_DEFAULT_CONFIG_PATH = "configs/reasoning_config.yaml"
 
-_DEFAULT_OUTPUT_DIR = "output/assay"
+_DEFAULT_OUTPUT_DIR = "output/reasoning"
 
 
 # ---------------------------------------------------------------------------
@@ -87,17 +87,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     -------
     argparse.Namespace
         Parsed arguments with attributes:
-        - ``config``: path to assay_config.yaml
+        - ``config``: path to reasoning_config.yaml
         - ``model``: optional model ID override
         - ``dry_run``: bool flag
     """
     parser = argparse.ArgumentParser(
-        description="Run the LLM Context-Shift Assay.",
+        description="Run Track 3 (reasoning).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
             "  python main.py --track reasoning -- --dry_run\n"
-            "  python main.py --track reasoning -- --config configs/assay_config.yaml --dry_run\n"
+            "  python main.py --track reasoning -- --config configs/reasoning_config.yaml --dry_run\n"
             "  python main.py --track reasoning -- --model meta-llama/Llama-3.1-8B-Instruct\n"
         ),
     )
@@ -106,7 +106,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=_DEFAULT_CONFIG_PATH,
         metavar="PATH",
         help=(
-            f"Path to assay_config.yaml (default: {_DEFAULT_CONFIG_PATH!r})"
+            f"Path to reasoning_config.yaml (default: {_DEFAULT_CONFIG_PATH!r})"
         ),
     )
     parser.add_argument(
@@ -190,7 +190,7 @@ def _build_shuffled_context_map(
     Parameters
     ----------
     context_builder:
-        Initialised :class:`~assay.context_builder.ContextBuilder`.
+        Initialised :class:`~tracks.reasoning.context_builder.ContextBuilder`.
     patient_ids:
         1-D array of patient IDs (one per row of the paired dataset).
     item_texts:
@@ -354,7 +354,7 @@ def _run_model(
     shuffled_context_map: dict[tuple[str, str], str],
     run_timestamp: str,
 ) -> None:
-    """Run the full assay pipeline for a single model ID.
+    """Run the full Track 3 pipeline for a single model ID.
 
     Parameters
     ----------
@@ -363,9 +363,9 @@ def _run_model(
     cfg:
         Validated configuration dictionary.
     paired_dataset:
-        :class:`~assay.dataset_loader.PairedDataset` instance.
+        :class:`~tracks.reasoning.dataset_loader.PairedDataset` instance.
     context_builder:
-        Initialised :class:`~assay.context_builder.ContextBuilder`.
+        Initialised :class:`~tracks.reasoning.context_builder.ContextBuilder`.
     shuffled_context_map:
         Pre-built ``{(patient_id, item_text): shuffled_context_text}`` dict.
     run_timestamp:
@@ -638,7 +638,7 @@ def _run_model(
 def _validate_config_dict(cfg: dict[str, Any]) -> dict[str, Any]:
     """Validate a configuration dict (already loaded from YAML).
 
-    Applies the same validation rules as :func:`assay.config_loader.load_config`
+    Applies the same validation rules as :func:`tracks.reasoning.config_loader.load_config`
     but operates on an in-memory dict rather than a file path.  This allows
     CLI overrides (e.g. ``--dry_run``) to be applied before validation.
 
@@ -749,7 +749,7 @@ def _clear_failed_cache_entries(cache_dir: str | Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Main entry point for the assay runner.
+    """Main entry point for the Track 3 runner.
 
     Parameters
     ----------
@@ -888,15 +888,15 @@ def main(argv: list[str] | None = None) -> int:
             # Continue with remaining models rather than aborting entirely
             continue
 
-    logging.info("Assay run complete.")
+    logging.info("Track 3 run complete.")
 
     # --- Emit manifests ---
-    _emit_assay_manifests(run_folder, cfg, model_ids, loader)
+    _emit_reasoning_manifests(run_folder, cfg, model_ids, loader)
 
     return 0
 
 
-def _emit_assay_manifests(
+def _emit_reasoning_manifests(
     run_folder: Path,
     cfg: dict[str, Any],
     model_ids: list[str],

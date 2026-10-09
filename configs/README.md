@@ -8,4 +8,4 @@ Files:
 - `main_config.yaml` — main pipeline configuration
 - `summary_config.yaml` — input summary configuration
 - `training_config.yaml` — training pipeline configuration
-- `assay_config.yaml` — reasoning track assay configuration
+- `reasoning_config.yaml` — reasoning track reasoning configuration

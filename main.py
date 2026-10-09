@@ -9,7 +9,7 @@ Usage:
 
 Examples:
     python main.py --track representation -- --config configs/main_config.yaml
-    python main.py --track reasoning -- --config configs/assay_config.yaml --dry_run
+    python main.py --track reasoning -- --config configs/reasoning_config.yaml --dry_run
     python main.py --help
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ import traceback
 # Maps track names → (module_path, function_name)
 _TRACK_DISPATCH: dict[str, tuple[str, str]] = {
     "representation": ("tracks.representation.runner", "main"),
-    "reasoning": ("tracks.reasoning.run_assay", "main"),
+    "reasoning": ("tracks.reasoning.run_reasoning", "main"),
 }
 
 

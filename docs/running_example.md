@@ -7,14 +7,14 @@ This guide gives commands, prerequisites, expected outputs, and troubleshooting 
 ### Track 3 — Reasoning (dry run, no LLM calls)
 
 ```bash
-python main.py --track reasoning -- --config configs/assay_config.yaml --dry_run --model dry_run_example
+python main.py --track reasoning -- --config configs/reasoning_config.yaml --dry_run --model dry_run_example
 ```
 
 ### Track 3 — Reasoning (real LLM)
 
 ```bash
 export HF_TOKEN=your_huggingface_token
-python main.py --track reasoning -- --config configs/assay_config.yaml --model meta-llama/Llama-3.1-8B-Instruct
+python main.py --track reasoning -- --config configs/reasoning_config.yaml --model meta-llama/Llama-3.1-8B-Instruct
 ```
 
 ### Track 1 — Representation (full training run)
@@ -55,7 +55,7 @@ Under `output/<run_id>/`:
 
 ### Track 3 Outputs
 
-Under `output/assay/<run_id>/`:
+Under `output/reasoning/<run_id>/`:
 
 | Artifact | Description |
 |----------|-------------|
@@ -84,4 +84,4 @@ Under `output/assay/<run_id>/`:
 | `LabelLeakageError` | An item's text appears in its own patient's snapshot | Reword the snapshot, or set `skip_label_leakage_check: true` if this is intended |
 | Score CSV has zero rows | Dataset loading silently dropped rows | Check `adapter_manifest.json` for row counts; enable verbose logging |
 | All-NaN score column | Score files written with a different label space | Re-parse the cached responses with the current config, or check that the score CSV columns match the keys in `adapter_manifest.json` |
-| `ConfigError: Missing required...` | Config YAML incomplete | Compare against `configs/assay_config.yaml` for required keys |
+| `ConfigError: Missing required...` | Config YAML incomplete | Compare against `configs/reasoning_config.yaml` for required keys |

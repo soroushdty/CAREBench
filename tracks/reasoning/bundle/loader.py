@@ -52,7 +52,7 @@ def load_physician_consensus(
 ) -> pd.DataFrame:
     """Load physician survey and interview consensus from dataset.xlsx.
 
-    Uses :class:`assay.dataset_loader.DatasetLoader` for physician-pair
+    Uses :class:`tracks.reasoning.dataset_loader.DatasetLoader` for physician-pair
     aggregation and triplet-correspondence verification.
 
     Parameters
@@ -76,7 +76,7 @@ def load_physician_consensus(
         List of category column names as they appear in the Excel file.
         Defaults to the standard 10-class names (e.g. "Behavioral health").
     class_definitions:
-        Optional keys per class (the assay config's ``data.class_definitions``),
+        Optional keys per class (the reasoning config's ``data.class_definitions``),
         as accepted by :meth:`shared.label_space.LabelSpace.from_config`.
 
     Returns

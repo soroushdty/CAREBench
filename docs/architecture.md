@@ -9,7 +9,7 @@ This document describes the package boundaries, dependency rules, and canonical 
 | `shared/` | stdlib, third-party | `tracks/`, `adapters/`, `main` |
 | `adapters/paired_context/` | stdlib, third-party, `shared/` | `tracks/`, other `adapters/*` |
 | `tracks/representation/` | stdlib, third-party, `shared/`, `adapters/` (via injection only in `framework.py`) | `tracks.reasoning`, direct adapter construction outside runner |
-| `tracks/reasoning/` | stdlib, third-party, `shared/`, `adapters/` (via injection in `run_assay.py`) | `tracks.representation`, direct adapter construction outside runner |
+| `tracks/reasoning/` | stdlib, third-party, `shared/`, `adapters/` (via injection in `run_reasoning.py`) | `tracks.representation`, direct adapter construction outside runner |
 | `main.py` | `tracks/*`, `adapters/*`, `shared/*` | — |
 
 ## Dependency Direction Diagram
@@ -23,7 +23,7 @@ main.py
   │
   ├──▶ tracks/reasoning/
   │       ├──▶ shared/
-  │       └──▶ adapters/paired_context/  (injected via run_assay.py)
+  │       └──▶ adapters/paired_context/  (injected via run_reasoning.py)
   │
   └──▶ adapters/paired_context/
           └──▶ shared/
@@ -81,9 +81,9 @@ Any class implementing `fit_and_evaluate(dataset: RepresentationDataset, config:
 ## Track 3 Adapter/Data Flow
 
 ```
-1. CLI: python main.py --track reasoning -- --config configs/assay_config.yaml --dry_run
-2. main.py dispatches to tracks.reasoning.run_assay.main()
-3. run_assay.py:
+1. CLI: python main.py --track reasoning -- --config configs/reasoning_config.yaml --dry_run
+2. main.py dispatches to tracks.reasoning.run_reasoning.main()
+3. run_reasoning.py:
    a. Loads and validates config from YAML
    b. DatasetLoader loads the paired dataset (via PairedContextReasoningAdapter internally)
    c. ContextBuilder builds correct-context and shuffled-context patient snapshots

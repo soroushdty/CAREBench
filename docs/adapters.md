@@ -57,7 +57,7 @@ class_definitions:
 
 In Track 3 these keys go under `data:`; in Track 1 they are top-level. Keys default to the name in snake_case (`Mood & anxiety` → `mood_anxiety`). A class named like a default category (for example `Genetics`) keeps that category's key and definition unless you override them. A class with no definition appears in the prompt by its key only, and Track 3 logs a warning. Keys and display names must be unique; config validation reports duplicates, malformed keys, and definitions for names that are not in `classes`.
 
-The Track 3 prompt's opening line and the word before "categories" are set in the assay config's optional `prompt` section. The defaults suit the SHARES taxonomy:
+The Track 3 prompt's opening line and the word before "categories" are set in the reasoning config's optional `prompt` section. The defaults suit the SHARES taxonomy:
 
 ```yaml
 prompt:

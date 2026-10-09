@@ -1,5 +1,5 @@
 """
-Hypothesis Analyzer for the LLM Context-Shift Assay.
+Hypothesis Analyzer for Track 3 (reasoning).
 
 Computes Track 3's endpoints (shared/endpoints.py) with patient-cluster
 bootstrap CIs and permutation-test p-values: context sensitivity (formerly
@@ -193,7 +193,7 @@ def permutation_test_h4(
 
 
 class HypothesisAnalyzer:
-    """Computes Track 3's four endpoints (formerly H1–H4) for the LLM context-shift assay.
+    """Computes Track 3's four endpoints (formerly H1–H4) for Track 3 (reasoning).
 
     Parameters
     ----------

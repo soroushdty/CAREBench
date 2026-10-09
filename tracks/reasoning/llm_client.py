@@ -1,5 +1,5 @@
 """
-LLM Client for the LLM Context-Shift Assay.
+LLM Client for Track 3 (reasoning).
 
 Supports three backend modes:
   - huggingface:      Uses huggingface_hub.InferenceClient for real inference
@@ -86,7 +86,7 @@ class FailedCall:
     item_id : str
         The item text (used as item identifier).
     condition : str
-        The assay condition.
+        The condition.
     prompt_hash : str
         16-character SHA-256 hex digest of the prompt.
     error_reason : str
@@ -131,7 +131,7 @@ class LLMClient:
     Parameters
     ----------
     cfg : dict
-        Validated configuration dictionary from :func:`assay.config_loader.load_config`.
+        Validated configuration dictionary from :func:`tracks.reasoning.config_loader.load_config`.
         Expected keys used by this class:
           - ``backend``          : "huggingface" | "dry_run"
           - ``retry_limit``      : int, maximum number of attempts per call

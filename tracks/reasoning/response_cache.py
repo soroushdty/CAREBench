@@ -1,5 +1,5 @@
 """
-Response Cache for the LLM Context-Shift Assay.
+Response Cache for Track 3 (reasoning).
 
 Provides a file-based cache for raw LLM responses, enabling resumability
 across interrupted runs. Cache files are stored in a structured directory:
@@ -10,7 +10,7 @@ Where ``item_hash = hashlib.sha256(item_text.encode()).hexdigest()[:12]``.
 
 The cache key is ``(model_id, condition, patient_id, item_text)``. The
 ``prompt_hash`` is stored with each response but is not part of the key;
-the assay runner compares it with the current prompt and runs the call again
+the Track 3 runner compares it with the current prompt and runs the call again
 when they differ, so a changed prompt never reuses an older answer.
 """
 
@@ -286,7 +286,7 @@ class ResponseCache:
         model_id : str
             The model identifier.
         condition : str
-            The assay condition.
+            The condition.
         patient_id : str
             The patient identifier.
         item_text : str

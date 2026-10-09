@@ -1,5 +1,5 @@
 """
-Analysis bundle generation for the LLM context-shift assay.
+Analysis bundle generation for Track 3 (reasoning).
 
 Post-hoc pipeline that consumes pre-generated score CSVs and produces a full
 reproducible analysis bundle (paired cell deltas, endpoint results, report, zip).

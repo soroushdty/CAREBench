@@ -1,4 +1,4 @@
-"""Tests for assay.bundle.hypotheses.compute_h1."""
+"""Tests for tracks.reasoning.bundle.hypotheses.compute_h1."""
 
 from __future__ import annotations
 

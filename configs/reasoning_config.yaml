@@ -41,10 +41,10 @@ n_permutations: 10000
 # Label leakage checking: set to true to skip validation (useful for datasets with known leakage issues)
 skip_label_leakage_check: false
 
-output_dir: output/assay
-cache_dir: output/assay/cache
-scores_dir: output/assay/scores
-reports_dir: output/assay/reports
+output_dir: output/reasoning
+cache_dir: output/reasoning/cache
+scores_dir: output/reasoning/scores
+reports_dir: output/reasoning/reports
 
 data:
   dataset_path: examples/synthetic/dataset.xlsx

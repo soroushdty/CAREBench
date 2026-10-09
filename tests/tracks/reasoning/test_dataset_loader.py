@@ -5,7 +5,7 @@ All tests use synthetic DataFrames; no real dataset.xlsx is required.
 The tests patch PairedContextDatasetAdapter.load_sheets so the Excel file is never read.
 
 Run with:
-    pytest tests/test_llm_context_shift_assay/test_dataset_loader.py --noconftest
+    pytest tests/tracks/reasoning/test_dataset_loader.py --noconftest
 """
 
 from __future__ import annotations

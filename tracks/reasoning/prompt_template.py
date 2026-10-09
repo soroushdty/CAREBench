@@ -1,5 +1,5 @@
 """
-Prompt template for the LLM Context-Shift Assay.
+Prompt template for Track 3 (reasoning).
 
 Generates deterministic prompts for each of the three conditions:
   - context_free
@@ -89,7 +89,7 @@ def _json_format(label_space: LabelSpace) -> str:
 
 
 class PromptTemplate:
-    """Generates deterministic prompts for the three assay conditions.
+    """Generates deterministic prompts for the three conditions.
 
     All methods are pure functions of their arguments — no timestamps,
     no random elements, no external I/O.  The same inputs always produce
@@ -136,7 +136,7 @@ class PromptTemplate:
         prompt_cfg: dict | None,
         label_space: LabelSpace | None = None,
     ) -> PromptTemplate:
-        """Build from the assay config's optional ``prompt`` section."""
+        """Build from the reasoning config's optional ``prompt`` section."""
         prompt_cfg = prompt_cfg or {}
         return cls(
             label_space,
@@ -196,7 +196,7 @@ class PromptTemplate:
             The EHR item string to classify.
         context_text : str
             The formatted patient context produced by
-            :class:`~assay.context_builder.ContextBuilder`.
+            :class:`~tracks.reasoning.context_builder.ContextBuilder`.
 
         Returns
         -------

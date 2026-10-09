@@ -80,4 +80,4 @@ The default categories are the ten sensitive-data categories used in the SHARES 
 
 ## Pointing a run at your data
 
-Copy `configs/assay_config.yaml` (Track 3) or `configs/main_config.yaml` (Track 1) and change the paths, plus the column and sheet names if yours differ. Keep real patient data out of version control. `data/` and `output/` are git-ignored, so either is a safe local location.
+Copy `configs/reasoning_config.yaml` (Track 3) or `configs/main_config.yaml` (Track 1) and change the paths, plus the column and sheet names if yours differ. Keep real patient data out of version control. `data/` and `output/` are git-ignored, so either is a safe local location.

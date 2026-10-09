@@ -1,5 +1,5 @@
 """
-Score Parser for the LLM Context-Shift Assay.
+Score Parser for Track 3 (reasoning).
 
 Iterates over all cache files for a given model, calls
 ``Schema_Validator.validate_response()`` on each cached response, and writes
@@ -85,12 +85,12 @@ class ScoreParser:
     ----------
     cache_dir : str or Path
         Root directory of the response cache (same as used by
-        :class:`assay.response_cache.ResponseCache`).
+        :class:`tracks.reasoning.response_cache.ResponseCache`).
     scores_dir : str or Path
         Root directory where CSV output files will be written.
         Model-specific subdirectories are created automatically.
     paired_dataset : optional
-        A :class:`assay.dataset_loader.PairedDataset` instance used to
+        A :class:`tracks.reasoning.dataset_loader.PairedDataset` instance used to
         determine the ordering of rows in the output CSVs.  If provided,
         rows are sorted by the order of ``(patient_id, item_text)`` in the
         dataset.  If ``None``, rows are sorted alphabetically by
@@ -129,7 +129,7 @@ class ScoreParser:
            ``{cache_dir}/{model_id_slug}/``.
         2. For each cached response:
            - If ``response.error`` is not None, record as ``LLMCallFailed``.
-           - Otherwise, call :func:`assay.schema_validator.validate_response`
+           - Otherwise, call :func:`tracks.reasoning.schema_validator.validate_response`
              on ``response.raw_text``.
            - On success, add the row to the appropriate condition's score list.
            - On validation failure, record in the errors list.

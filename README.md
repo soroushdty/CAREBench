@@ -22,11 +22,11 @@ The framework is a **functional analogy to physician decision-making**. Each eva
 python -m pip install -r requirements.txt
 export PYTHONHASHSEED=42
 
-# Track 3: LLM context-shift assay on the synthetic example, no LLM calls
-python main.py --track reasoning -- --config configs/assay_config.yaml --dry_run --model dry_run_example
+# Track 3 (reasoning) on the synthetic example, no LLM calls
+python main.py --track reasoning -- --config configs/reasoning_config.yaml --dry_run --model dry_run_example
 ```
 
-Outputs go to `output/assay/<run_id>/`. To use your own data, see [`docs/data_format.md`](docs/data_format.md).
+Outputs go to `output/reasoning/<run_id>/`. To use your own data, see [`docs/data_format.md`](docs/data_format.md).
 
 ## Architecture
 
@@ -47,7 +47,7 @@ Dependencies point one way: `tracks/` and `adapters/` import from `shared/`; `sh
 | 3 – Reasoning | Deliberating over the chart at decision time, without changing what the model knows | Does the shift come from reasoning at decision time? | Available |
 
 - **[Track 1 — Representation](tracks/representation/README.md)** (`tracks/representation/`): embedding pipeline (default model Bio_ClinicalBERT), multilabel classifier, context-aware fusion head, LOPO-CV, and statistical analysis of the `directional_alignment` and `brier_improvement` endpoints.
-- **[Track 3 — Reasoning](tracks/reasoning/README.md)** (`tracks/reasoning/`): LLM context-shift assay pipeline. Runs each EHR item under three conditions (context-free, correct-context, shuffled-context) and computes the four Track 3 endpoints against physician judgment shifts.
+- **[Track 3 — Reasoning](tracks/reasoning/README.md)** (`tracks/reasoning/`): LLM prompting pipeline. Runs each EHR item under three conditions (context-free, correct-context, shuffled-context) and computes the four Track 3 endpoints against physician judgment shifts.
 
 ### Shared Layer
 
@@ -95,17 +95,17 @@ LM-ContextProbe 0.1.0 is an early public release of an evaluation framework. It 
 
 **Development history.** LM-ContextProbe began as the analysis code for the study described under [Origins and Acknowledgments](#origins-and-acknowledgments) and was developed in a private repository from January to June 2026 (about 800 commits). It was then generalized into a dataset-agnostic framework. This public repository was created from a sanitized snapshot, so that study data and private development material are not in its git history. A short public commit history does not reflect the age of the code.
 
-## LLM Context-Shift Assay (Track 3)
+## Track 3 — Reasoning
 
-The assay runs each EHR item through a Hugging Face LLM under three conditions:
+Track 3 runs each EHR item through a Hugging Face LLM under three conditions:
 
 1. **Context-free**: Item text only, no patient information.
 2. **Correct-context**: Item text plus the correct patient's clinical snapshot.
 3. **Shuffled-context**: Item text plus a randomly selected different patient's clinical snapshot (control).
 
-For each condition the LLM outputs a JSON object with probability scores for all ten privacy categories. The assay then computes physician and LLM judgment deltas and the four Track 3 endpoints.
+For each condition the LLM outputs a JSON object with probability scores for all ten privacy categories. Track 3 then computes physician and LLM judgment deltas and the four Track 3 endpoints.
 
-Canonical entry point: `tracks/reasoning/run_assay.py`. See [`tracks/reasoning/README.md`](tracks/reasoning/README.md) for full details.
+Canonical entry point: `tracks/reasoning/run_reasoning.py`. See [`tracks/reasoning/README.md`](tracks/reasoning/README.md) for full details.
 
 ## Installation
 
@@ -120,7 +120,7 @@ Requires Python >= 3.10.
 ### Track 3 — Reasoning (dry run)
 
 ```bash
-python main.py --track reasoning -- --config configs/assay_config.yaml --dry_run --model dry_run_example
+python main.py --track reasoning -- --config configs/reasoning_config.yaml --dry_run --model dry_run_example
 ```
 
 The dry run generates deterministic mock scores and complete artifact trees without calling an LLM. See [`docs/running_example.md`](docs/running_example.md) for full guidance.
@@ -138,7 +138,7 @@ The first run downloads the `emilyalsentzer/Bio_ClinicalBERT` embedding model (~
 ### Track 3 with a real LLM
 
 ```bash
-python main.py --track reasoning -- --config configs/assay_config.yaml --model meta-llama/Llama-3.1-8B-Instruct
+python main.py --track reasoning -- --config configs/reasoning_config.yaml --model meta-llama/Llama-3.1-8B-Instruct
 ```
 
 Requires a valid `HF_TOKEN` environment variable.
@@ -189,7 +189,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the adapter/strategy prot
 
 For Google Colab, Jupyter, or HPC: open `main_notebook.ipynb`.
 
-## Assay Pipeline Stages
+## Track 3 Pipeline Stages
 
 | Stage                    | Description                                                                                                                                     |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -205,9 +205,9 @@ For Google Colab, Jupyter, or HPC: open `main_notebook.ipynb`.
 
 All configuration files live in `configs/`.
 
-### LLM Assay Configuration
+### Track 3 Configuration
 
-`configs/assay_config.yaml` controls the LLM context-shift assay:
+`configs/reasoning_config.yaml` controls Track 3:
 
 | Key | Purpose |
 |-----|---------|
@@ -274,7 +274,7 @@ LM-ContextProbe/
 │   │   ├── training/          # Ensemble pipeline, calibration, CV, threshold tuning
 │   │   ├── models/            # EnsemblePredictor, MultiLabelModel, ModelRegistry
 │   │   └── statistical/       # Endpoint tests, run_analysis orchestrator, reporting
-│   └── reasoning/             # Track 3: LLM assay pipeline
+│   └── reasoning/             # Track 3: LLM reasoning pipeline
 │       └── bundle/            # Post-hoc analysis bundle (deltas, endpoints, report)
 ├── adapters/                  # Dataset adapters
 │   └── paired_context/        # Paired-context adapter (column maps, labels, Track 1 and Track 3 adapters)

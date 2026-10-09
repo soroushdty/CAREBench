@@ -16,6 +16,7 @@ class TestRunManifestSchema:
         "timestamp_utc",
         "track",
         "entry_command",
+        "protocol_version",
     ]
 
     def test_track1_run_manifest_keys(self, minimal_track1_run: Path):

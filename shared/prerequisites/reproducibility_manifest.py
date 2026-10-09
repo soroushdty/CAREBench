@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 import yaml
 
+from shared.endpoints import PROTOCOL_VERSION
 from shared.utils.path_utils import is_remote_location as _is_remote_location
 
 
@@ -121,6 +122,7 @@ def write_reproducibility_manifest(
     payload: dict[str, Any] = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "run_id": str(extra.get("run_id") or "") if extra and extra.get("run_id") else str(config_data.get("RUN_ID", "")),
+        "protocol_version": PROTOCOL_VERSION,
         "python_version": platform.python_version(),
         "python_executable": sys.executable,
         "platform": platform.platform(),

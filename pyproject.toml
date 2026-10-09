@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lm-contextprobe"
-version = "0.1.0"
+version = "0.2.0"
 description = "Evaluation framework for testing whether language models shift their sensitive-data judgments with patient context the way physicians do"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Soroush Dianaty" }]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
   "numpy==2.0.2",
   "pandas==2.2.2",

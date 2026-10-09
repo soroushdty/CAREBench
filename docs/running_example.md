@@ -29,7 +29,7 @@ The first run downloads the `emilyalsentzer/Bio_ClinicalBERT` embedding model (~
 
 | Requirement | Notes |
 |-------------|-------|
-| Python ≥ 3.10 | See `.python-version` |
+| Python ≥ 3.11 | See `.python-version` |
 | Dependencies | `python -m pip install -r requirements.txt` |
 | Dataset workbook | Path declared in config (`examples/synthetic/dataset.xlsx` by default) |
 | Patient summaries | Path declared in config (`examples/synthetic/patient_summaries.json` by default) |

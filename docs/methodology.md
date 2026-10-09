@@ -122,6 +122,14 @@ Secondary and descriptive outputs: Wasserstein distance to the label distributio
 - **Multiplicity.** Track 1 applies Benjamini–Hochberg (q = 0.05) across classes. Track 3 reports per-category results descriptively and does not correct them.
 - **Seeds.** Bootstrap, permutation, shuffled-context and generation seeds are set in config and recorded in the run manifest. `PYTHONHASHSEED` must be set before Python starts (see the README).
 
+## Protocol version
+
+The evaluation protocol (the endpoints, their statistics and tests, and the defaults that change reported values) is versioned separately from the code, as `PROTOCOL_VERSION` in `shared/endpoints.py`. Every `run_manifest.json` records it as `protocol_version`, and the Track 3 run report and the post-hoc bundle report print it. Results can then say "LM-ContextProbe protocol v1", and a code release that leaves the numbers unchanged does not invalidate them. The version is bumped whenever a change would alter reported values for the same data and model.
+
+| Protocol | First release | Changes |
+|----------|---------------|---------|
+| 1 | 0.2.0 | First versioned protocol: the endpoints and tests described on this page, including the shuffled-context reference for `context_sensitivity` and the within-patient permutation null for `directional_alignment` ([#17](https://github.com/soroushdty/LM-ContextProbe/issues/17)) |
+
 ## Design decisions and what they guard against
 
 Most of the machinery in LM-ContextProbe exists because a simpler version gave a misleading answer during development. Each row names the pitfall and the safeguard.
@@ -149,4 +157,4 @@ These are known gaps between the intended design and the current code.
 
 - **`class_correspondence` is a correlation over the number of categories** (ten by default), so it has little power and is best read descriptively.
 - **No simulation-based validation yet.** The false-positive rate and power of the endpoints under known effects have not been measured. ([#18](https://github.com/soroushdty/LM-ContextProbe/issues/18))
-- **One label taxonomy** ([#5](https://github.com/soroushdty/LM-ContextProbe/issues/5)) and **one dataset format** ([#6](https://github.com/soroushdty/LM-ContextProbe/issues/6)) so far.
+- **One dataset format so far** (the paired-context workbook; [#6](https://github.com/soroushdty/LM-ContextProbe/issues/6)). The label taxonomy is configurable ([`docs/adapters.md`](adapters.md#label-space-sharedlabel_spacepy)).

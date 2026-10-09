@@ -1,7 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 — unreleased
 
+The first archived release (Zenodo DOI). Endpoints and tests are **protocol v1**.
+
+- **Protocol version.** `PROTOCOL_VERSION` in `shared/endpoints.py` versions the endpoints and tests separately from the code. It is written to every `run_manifest.json` (and Track 1's reproducibility manifest) as `protocol_version`, to the post-hoc bundle's run parameters, and to the header of the Track 3 run report and the bundle report. It is bumped whenever a change would alter reported values; the history is in `docs/methodology.md#protocol-version`. This release is protocol v1.
+- **Python 3.11 or newer.** `requires-python` said 3.10, but the pinned `scipy==1.17.1` needs 3.11, so installing on 3.10 failed. CI now tests 3.11 and 3.12.
+- **Citation metadata.** `CITATION.cff` has the author's ORCID and the repository URL, and no longer gives a release date: Zenodo takes it from the GitHub release.
 - **Track 3's `context_sensitivity` and `directional_alignment` now have a reference and a test** (#17). Both used to report only an estimate with a CI, which almost any model would pass.
   - `context_sensitivity` is tested against the shuffled-context condition. It reports mean |Δ| for correct and shuffled context, their paired difference with a patient-cluster CI, and a one-sided patient-cluster sign-flip p-value (`p_value`; `paired_permutation_p` in the post-hoc bundle).
   - `directional_alignment` reports the sign-agreement rate expected by chance and a one-sided p-value. Both come from a permutation null that shuffles each patient's model deltas among that patient's items (`null_sign_agreement_rate`, `p_value`; `null_sign_agreement_correct`, `permutation_p_correct` on the bundle's aggregate row). It also reports the shuffled-context rates.
@@ -36,6 +41,8 @@
   - With exact enumeration the smallest attainable p-value is `2^-(number of patients)`; see `docs/methodology.md`.
 
 ## 0.1.0 — 2026-10-07
+
+Not tagged or archived; the first archived release is 0.2.0.
 
 Initial public release.
 

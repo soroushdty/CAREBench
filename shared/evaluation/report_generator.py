@@ -29,6 +29,7 @@ from shared.endpoints import (
     CONTEXT_SENSITIVITY,
     CONTEXT_SPECIFICITY,
     DIRECTIONAL_ALIGNMENT,
+    PROTOCOL_VERSION,
     Endpoint,
 )
 from shared.label_space import DEFAULT_LABEL_SPACE, LabelSpace
@@ -242,7 +243,8 @@ class ReportGenerator:
         lines.append(
             "# Track 3 (Reasoning) Context-Shift Report\n\n"
             f"**Model:** {self._model_id}  \n"
-            f"**Run timestamp:** {self._run_timestamp}"
+            f"**Run timestamp:** {self._run_timestamp}  \n"
+            f"**Protocol version:** {PROTOCOL_VERSION}"
         )
         return "\n".join(lines)
 

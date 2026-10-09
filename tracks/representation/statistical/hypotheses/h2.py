@@ -1,6 +1,6 @@
 """H2 (Contextual Alignment) hypothesis tests.
 
-Two analyses per §3.7:
+Two analyses (see the Track 1 endpoints in docs/methodology.md):
   1. Paired per-class test of Brier-score improvement: patient-cluster
      sign-flip test (confirmatory), with the Wilcoxon signed-rank p-value
      kept as a descriptive, unclustered reference
@@ -65,7 +65,7 @@ def h2_wilcoxon_per_class(
     n_permutations: int = 10_000,
     perm_rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
-    """Paired per-class test of Brier-score improvement (§3.7 H2).
+    """Paired per-class test of Brier-score improvement (H2).
 
     For each class c:
         BS_cf(i,c) = (ŷ_cf(i,c) - y_int(i,c))²
@@ -155,7 +155,7 @@ def h2_wasserstein_per_class(
     n_resamples: int = 1000,
     rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
-    """Per-class Wasserstein-1 distance between predictions and interview labels (§5.4.3).
+    """Per-class Wasserstein-1 distance between predictions and interview labels.
 
     W_cf(c) = W₁(ŷ_cf[:,c], y_int[:,c])
     W_ca(c) = W₁(ŷ_ca[:,c], y_int[:,c])
@@ -216,7 +216,7 @@ def h2_macro_summary(
     n_resamples: int = 1000,
     rng: np.random.Generator | None = None,
 ) -> dict:
-    """Macro-average Brier score and improvement with CI (§5.4.2).
+    """Macro-average Brier score and improvement with CI.
 
     Returns dict with:
         macro_BS_cf, macro_BS_ca, macro_improvement,

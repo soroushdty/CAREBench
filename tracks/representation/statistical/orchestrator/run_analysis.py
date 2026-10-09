@@ -1,4 +1,6 @@
-"""Top-level statistical analysis orchestrator (§3.7 / §5).
+"""Top-level statistical analysis orchestrator for Track 1.
+
+See the Track 1 endpoints in docs/methodology.md.
 
 Calls all hypothesis tests, ICC analysis, entropy, stratum, and figure
 functions in a fixed order and saves outputs to a structured directory.
@@ -17,21 +19,21 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 _OUTPUTS = {
-    "tau_robustness.csv":      "τ=0.5 vs F1-optimal robustness check (§3.4 / §5.1)",
-    "h1_per_class.csv":        "H1 per-class sign agreement (Tables 3+4)",
-    "h1_aggregate.json":       "H1 aggregate permutation test result (§5.3.3)",
-    "h1_cmh.json":             "H1 CMH pooled cross-class inference (§5.3.4)",
-    "h2_brier.csv":            "H2 per-class Brier Wilcoxon test (Table 5)",
-    "h2_brier_summary.json":   "H2 macro-average Brier summary (§5.4.2)",
-    "h2_wasserstein.csv":      "H2 per-class Wasserstein distance (Table 6)",
-    "icc_results.csv":         "Rater-level ICC(2,1) model-vs-physician (§5.5)",
+    "tau_robustness.csv":      "τ=0.5 vs F1-optimal robustness check",
+    "h1_per_class.csv":        "H1 per-class sign agreement",
+    "h1_aggregate.json":       "H1 aggregate permutation test result",
+    "h1_cmh.json":             "H1 CMH pooled cross-class inference",
+    "h2_brier.csv":            "H2 per-class Brier improvement test",
+    "h2_brier_summary.json":   "H2 macro-average Brier summary",
+    "h2_wasserstein.csv":      "H2 per-class Wasserstein distance",
+    "icc_results.csv":         "Rater-level ICC(2,1) model-vs-physician",
     "icc_summary.json":        "Rater-level ICC summary statistics",
     "calibration_ece.csv":     "Per-class ECE with >0.10 flag and bootstrap CIs",
-    "entropy_change.csv":      "Context-induced entropy change (§5.9.2)",
+    "entropy_change.csv":      "Context-induced entropy change",
     "entropy_pearson.json":    "Pearson r between physician and model entropy change (descriptive only)",
-    "stratum_analysis.csv":    "Stratum repeated vs novel (Table 7 / §5.6)",
-    "ablation_scores.csv":     "Sub-field ablation attribution A(k,c) (Table 11 / §3.6)",
-    "arch_comparison.csv":     "Architectural comparison (Tables 8-9 / §5.7)",
+    "stratum_analysis.csv":    "Stratum repeated vs novel",
+    "ablation_scores.csv":     "Sub-field ablation attribution A(k,c)",
+    "arch_comparison.csv":     "Architectural comparison",
     "figures/figure1_delta_histogram.png":       "Figure 1",
     "figures/figure2_interphysician_agreement.png": "Figure 2",
     "figures/figure3_icc_horizontal_plot.png":   "Figure 3",
@@ -51,7 +53,7 @@ def _save_csv(path: Path, df: pd.DataFrame) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Sub-field ablation (§3.6)
+# Sub-field ablation
 # ---------------------------------------------------------------------------
 
 def _run_ablation(
@@ -262,14 +264,14 @@ def run_statistical_analysis(
     """Run all statistical analyses and save outputs to output_dir.
 
     Args:
-        y_survey:           (121, 10) pair-aggregated survey labels.
-        y_interview:        (121, 10) pair-aggregated interview labels.
-        y_hat_cf:           (121, 10) context-free predictions (Stage 1 only).
-        y_hat_ca:           (121, 10) context-aware predictions (Stage 2).
-        patient_ids:        (121,) patient IDs.
-        item_texts:         (121,) item text strings.
-        class_list:         10 class names.
-        avg_thresh_f1opt:   (10,) mean inner-fold F1-optimal thresholds.
+        y_survey:           (n_pairs, n_classes) pair-aggregated survey labels.
+        y_interview:        (n_pairs, n_classes) pair-aggregated interview labels.
+        y_hat_cf:           (n_pairs, n_classes) context-free predictions (Stage 1 only).
+        y_hat_ca:           (n_pairs, n_classes) context-aware predictions (Stage 2).
+        patient_ids:        (n_pairs,) patient IDs.
+        item_texts:         (n_pairs,) item text strings.
+        class_list:         Class names, length n_classes.
+        avg_thresh_f1opt:   (n_classes,) mean inner-fold F1-optimal thresholds.
         tau_fixed:          Fixed threshold (cfg['tau'], default 0.5).
         dataset_path:       Path to dataset.xlsx (for individual physician labels).
         sheet_names:        dict with keys 'train', 'test', 'interview'.
@@ -279,8 +281,8 @@ def run_statistical_analysis(
         output_dir:         Root directory for all statistical outputs.
         n_resamples:        Bootstrap CI resamples (default 1000).
         n_permutations:     H1 permutation test replicates (default 10,000).
-        strata:             (121,) 'repeated'/'novel' labels; computed if None.
-        arch_predictions:   {arch_name: (121,10)} for arch comparison; skipped if None.
+        strata:             (n_pairs,) 'repeated'/'novel' labels; computed if None.
+        arch_predictions:   {arch_name: (n_pairs, n_classes)} for arch comparison; skipped if None.
         ensemble_bundle_path: Path to ensemble_bundle.joblib for ablation.
         item_texts_train:   Training item strings for strata assignment.
         rng:                Optional numpy Generator for reproducibility.
@@ -478,7 +480,7 @@ def run_statistical_analysis(
             logger.warning("ICC analysis failed: %s", exc, exc_info=True)
 
     # ------------------------------------------------------------------
-    # Step 9.5 — Calibration ECE per class (§3.7)
+    # Step 9.5 — Calibration ECE per class
     # ------------------------------------------------------------------
     from shared.evaluation.calibration import calibration_ece_per_class
     ece_df = calibration_ece_per_class(

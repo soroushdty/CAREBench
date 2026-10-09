@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **No references to the private methodology document** (#21). Docstrings, comments and config no longer cite section, table or figure numbers from the unpublished protocol; where a pointer helps, they link to `docs/methodology.md`. Array shapes are written as `(n_pairs, n_classes)` instead of the original study's sizes. A new test (`tests/architecture/test_no_private_references.py`) fails if a section sign (U+00A7) appears outside `docs/`.
+- Figure 3's legend now shows the actual number of model-vs-physician and human-human ICCs instead of the fixed counts 24 and 12.
 - **Track 1 CLI runs through `RepresentationTrack`** (#1). `python main.py --track representation` now builds the dataset adapter and training strategy from config (`adapter`, default `paired_context`; `strategy`, default `existing_ensemble`) and runs them through the framework. `PairedContextRepresentationAdapter` loads the workbook and context records with the same loaders as Track 3, and `ExistingEnsembleTrainingStrategy` now builds the Stage 2 context vectors and runs the statistical analysis. Outputs on `examples/synthetic` are unchanged, and each run folder also gets `run_manifest.json`, `adapter_manifest.json`, `artifact_index.json`, and `resolved_config.yaml`.
 - `PairedContextRepresentationAdapter` now reads the Track 1 config keys (`DIR_DATASET`, `TRAIN_SHEET`, `DIR_CONTEXT`, `llm`, ...) instead of `dataset_path` / `stage2_enabled` / `embedding_model`.
 - `DIR_CONTEXT` is resolved against the project root (`--dir`), like `DIR_DATASET`, instead of the current working directory.

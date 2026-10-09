@@ -1,10 +1,10 @@
-"""Architectural comparison table with paired bootstrap differences (§5.7).
+"""Architectural comparison table with paired bootstrap differences.
 
 Benchmarks the four-vector fusion head against alternative fusion
 architectures and baselines.  Accepts a dict of predictions gathered from
 separate pipeline runs (one per architecture) or from a multi-arch run.
 
-Expected architecture keys (§3.5):
+Expected architecture keys:
   Fusion heads:   '4_vector', '2d', '3d', 'lowrank_bilinear'
   Baselines:      'passthrough', 'patient_id', 'stage1_only'
 """
@@ -17,7 +17,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Approximate parameter counts per class per architecture (§3.5 text)
+# Approximate parameter counts per class per architecture
 _PARAM_COUNTS: dict[str, str] = {
     "4_vector":         "4d (30,720/class at d=768)",
     "2d":               "2d (1,536/class at d=768)",

@@ -1,4 +1,4 @@
-"""Context-induced entropy change analysis (§5.9.2 / exploratory).
+"""Context-induced entropy change analysis (exploratory).
 
 Binary entropy H(p) applied per class per item to characterize whether the
 model's predictive uncertainty changes from context-free to context-aware in
@@ -76,7 +76,7 @@ def entropy_pearson_r(
 ) -> dict:
     """Pearson r between physician and model entropy change.
 
-    Pooled across confirmatory-eligible classes (§5.9.2).
+    Pooled across confirmatory-eligible classes.
     Treated as descriptive only — no hypothesis correction applied.
 
     Args:
@@ -119,7 +119,7 @@ def entropy_pearson_r(
     return {
         "pearson_r": float(r),
         # Provided for completeness; NOT a confirmatory inference — no BH correction,
-        # no decision threshold.  Treat as descriptive/exploratory only (§5.9.2).
+        # no decision threshold.  Treat as descriptive/exploratory only.
         "p_value_descriptive_only": float(p),
         "descriptive_only": True,
         "n_observations": int(len(ph)),

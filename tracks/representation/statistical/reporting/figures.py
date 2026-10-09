@@ -1,12 +1,12 @@
-"""Figures 1-4 from §5.2, §5.5, and §5.9.2.
+"""Track 1 statistical figures 1-4.
 
 All figures use matplotlib and are saved to disk.  Each function accepts a
 `dpi` argument (default 150) and saves with bbox_inches='tight'.
 
-Figure 1 — Per-class Δ_p histogram (§5.2)
-Figure 2 — Per-patient inter-physician agreement survey vs interview (§5.2)
-Figure 3 — ICC(2,1) horizontal dot plot (§5.5)
-Figure 4 — Entropy change scatter plot (§5.9.2)
+Figure 1 — Per-class Δ_p histogram
+Figure 2 — Per-patient inter-physician agreement survey vs interview
+Figure 3 — ICC(2,1) horizontal dot plot
+Figure 4 — Entropy change scatter plot
 """
 from __future__ import annotations
 
@@ -24,14 +24,14 @@ def figure1_delta_histogram(
     output_path: Path,
     dpi: int = 150,
 ) -> None:
-    """2×5 grid of per-class Δ_p histograms (§5.2 Figure 1).
+    """2×5 grid of per-class Δ_p histograms (Figure 1).
 
     Bars: positive Δ_p values in green, negative in red, zero in gray.
     Each panel is annotated with the count of non-zero deltas.
 
     Args:
         delta_p:     (n, n_classes) physician delta matrix.
-        class_list:  10 class names.
+        class_list:  Class names, length n_classes.
         output_path: File path to save the PNG/PDF.
         dpi:         Figure DPI.
     """
@@ -85,7 +85,7 @@ def figure2_interphysician_agreement(
     output_path: Path,
     dpi: int = 150,
 ) -> None:
-    """Per-patient inter-physician agreement in survey vs interview (§5.2 Figure 2).
+    """Per-patient inter-physician agreement in survey vs interview (Figure 2).
 
     For each patient, computes the mean absolute agreement rate across classes
     between the two physicians in both phases.  Patients with lower interview-
@@ -93,7 +93,7 @@ def figure2_interphysician_agreement(
 
     Args:
         individual_labels: From icc.load_individual_physician_labels().
-        class_list:        10 class names.
+        class_list:        Class names, length n_classes.
         output_path:       File path to save.
         dpi:               Figure DPI.
     """
@@ -171,11 +171,12 @@ def figure3_icc_horizontal_plot(
     output_path: Path,
     dpi: int = 150,
 ) -> None:
-    """ICC(2,1) horizontal dot plot (§5.5 Figure 3).
+    """ICC(2,1) horizontal dot plot (Figure 3).
 
-    Shows 12 within-pair human-human ICCs (gray points, sorted ascending)
-    with mean ± 1 SD shaded band, overlaid with the 24 model-vs-physician
-    ICC(2,1) values as orange points, each with its 95% bootstrap CI.
+    Shows one within-pair human-human ICC per patient (gray points, sorted
+    ascending) with mean ± 1 SD shaded band, overlaid with one
+    model-vs-physician ICC(2,1) per (patient, physician) as orange points,
+    each with its 95% bootstrap CI.
     Patients with low within-pair ICC are flagged.
 
     Args:
@@ -220,8 +221,8 @@ def figure3_icc_horizontal_plot(
     hh_ytick_labels = [f"HH-{i+1}" for i in range(len(hh_vals))]
     ax.set_yticklabels(hh_ytick_labels + labels, fontsize=7)
 
-    orange_patch = mpatches.Patch(color="#ed7d31", label="Model vs physician (24 ICCs)")
-    blue_patch = mpatches.Patch(color="steelblue", label="Within-pair human-human (12 ICCs)")
+    orange_patch = mpatches.Patch(color="#ed7d31", label=f"Model vs physician ({len(mp)} ICCs)")
+    blue_patch = mpatches.Patch(color="steelblue", label=f"Within-pair human-human ({len(hh_vals)} ICCs)")
     ax.legend(handles=[orange_patch, blue_patch], fontsize=8, loc="lower right")
 
     plt.tight_layout()
@@ -241,7 +242,7 @@ def figure4_entropy_scatter(
     output_path: Path,
     dpi: int = 150,
 ) -> None:
-    """Physician vs model entropy change scatter (§5.9.2 Figure 4).
+    """Physician vs model entropy change scatter (Figure 4).
 
     Each point is one (item, class) observation pooled across confirmatory-
     eligible classes, colored by class.  Pearson r annotated as descriptive.

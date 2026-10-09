@@ -73,13 +73,14 @@ def confirmatory_eligible_classes(
 ) -> tuple[list[str], list[str]]:
     """Partition classes into confirmatory-eligible and descriptive-only.
 
-    §3.1.1: classes with fewer than `min_nonzero` non-zero pair-aggregated
-    physician deltas are prespecified as descriptive-only.
+    Classes with fewer than `min_nonzero` non-zero pair-aggregated
+    physician deltas are prespecified as descriptive-only (see
+    the Track 1 endpoints in docs/methodology.md).
 
     Args:
         delta_p:    (n, n_classes) physician delta matrix.
         class_list: List of class names, length n_classes.
-        min_nonzero:Threshold; default 15 per §3.1.1.
+        min_nonzero:Threshold; default 15.
 
     Returns:
         (eligible_classes, descriptive_only_classes) — both lists of str.

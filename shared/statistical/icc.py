@@ -1,4 +1,4 @@
-"""ICC(2,1) rater-level analysis and Lin's CCC (§3.7 / §5.5).
+"""ICC(2,1) rater-level analysis and Lin's CCC.
 
 ICC(2,1): two-way mixed effects, absolute agreement, single measurement.
 Implemented analytically using the standard SS decomposition — no external
@@ -61,7 +61,7 @@ def icc21(ratings: np.ndarray) -> float:
 
 
 def lins_ccc(x: np.ndarray, y: np.ndarray) -> float:
-    """Lin's concordance correlation coefficient (§3.7 secondary metric).
+    """Lin's concordance correlation coefficient (secondary metric).
 
     CCC = 2·cov(x,y) / (var(x) + var(y) + (mean(x) - mean(y))²)
 
@@ -158,11 +158,11 @@ def rater_icc_analysis(
     n_resamples: int = 1000,
     rng: np.random.Generator | None = None,
 ) -> dict:
-    """Rater-level ICC(2,1) analysis (§3.7 / §5.5).
+    """Rater-level ICC(2,1) analysis.
 
     The model is treated as an additional rater.  For each (patient, physician)
     cell, ICC(2,1) is computed between:
-      - Model's continuous predictions in [0, 1] for that patient's items × 10 classes
+      - Model's continuous predictions in [0, 1] for that patient's items × all classes
       - That physician's individual binary labels {0, 1}
 
     Produces:
@@ -174,7 +174,7 @@ def rater_icc_analysis(
         individual_labels: From load_individual_physician_labels() — use interview split.
         patient_ids_test:  (n_test,) patient IDs for each test item.
         item_texts_test:   (n_test,) item text strings.
-        class_list:        10 class names.
+        class_list:        Class names, length n_classes.
         n_resamples:       Bootstrap CI resamples.
 
     Returns dict with keys:

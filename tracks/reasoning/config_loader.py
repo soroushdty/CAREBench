@@ -71,6 +71,41 @@ VALID_BACKENDS: set[str] = {"huggingface", "dry_run", "local_transformers"}
 # Public API
 # ---------------------------------------------------------------------------
 
+def validate_label_space_config(data_section: dict[str, Any]) -> None:
+    """Check that ``classes`` and ``class_definitions`` form a valid label space."""
+    from shared.label_space import LabelSpace
+
+    try:
+        LabelSpace.from_config(
+            data_section["classes"], data_section.get("class_definitions")
+        )
+    except ValueError as exc:
+        raise ConfigError(f"Invalid label space in 'data': {exc}") from exc
+
+
+_PROMPT_KEYS = {"intro", "category_type"}
+
+
+def validate_prompt_config(prompt_cfg: Any) -> None:
+    """Check the optional ``prompt`` section (``intro``, ``category_type``)."""
+    if prompt_cfg is None:
+        return
+    if not isinstance(prompt_cfg, dict):
+        raise ConfigError("The 'prompt' configuration key must be a mapping.")
+    unknown = sorted(set(prompt_cfg) - _PROMPT_KEYS)
+    if unknown:
+        raise ConfigError(
+            f"Unknown 'prompt' configuration key(s): {', '.join(unknown)}. "
+            f"Allowed: {', '.join(sorted(_PROMPT_KEYS))}."
+        )
+    intro = prompt_cfg.get("intro")
+    if intro is not None and (not isinstance(intro, str) or not intro.strip()):
+        raise ConfigError("'prompt.intro' must be a non-empty string.")
+    category_type = prompt_cfg.get("category_type")
+    if category_type is not None and not isinstance(category_type, str):
+        raise ConfigError("'prompt.category_type' must be a string (use \"\" for none).")
+
+
 def load_config(config_path: str | Path) -> dict[str, Any]:
     """Load and validate the assay configuration file.
 
@@ -140,6 +175,8 @@ def load_config(config_path: str | Path) -> dict[str, Any]:
             f"Missing required 'data' configuration parameter(s): {', '.join(missing_data)}"
         )
 
+    validate_label_space_config(data_section)
+    validate_prompt_config(cfg.get("prompt"))
     return cfg
 
 
@@ -221,6 +258,8 @@ def _validate_config_dict(cfg: dict[str, Any]) -> dict[str, Any]:
             f"Missing required 'data' configuration parameter(s): {', '.join(missing_data)}"
         )
 
+    validate_label_space_config(data_section)
+    validate_prompt_config(cfg.get("prompt"))
     return cfg
 
 

@@ -24,6 +24,8 @@ physician_col: Physician
 item_col: Item
 
 # LABEL SPACE DEFINITION
+# One workbook column per class. Optional `class_definitions` sets a class's
+# key (and its Track 3 prompt definition); see docs/adapters.md.
 classes:
   - Behavioral health
   - Diagnoses

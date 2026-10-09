@@ -24,7 +24,7 @@ def figure1_delta_histogram(
     output_path: Path,
     dpi: int = 150,
 ) -> None:
-    """2×5 grid of per-class Δ_p histograms (Figure 1).
+    """Grid of per-class Δ_p histograms, five per row (Figure 1).
 
     Bars: positive Δ_p values in green, negative in red, zero in gray.
     Each panel is annotated with the count of non-zero deltas.
@@ -41,8 +41,12 @@ def figure1_delta_histogram(
 
     dp = np.asarray(delta_p, dtype=np.float32)
     n_classes = len(class_list)
-    n_rows, n_cols = 2, 5
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(16, 7))
+    n_cols = min(5, max(n_classes, 1))
+    n_rows = max(1, -(-n_classes // n_cols))
+    # 16 × 7 inches for the default ten classes (2 × 5)
+    fig, axes = plt.subplots(
+        n_rows, n_cols, figsize=(3.2 * n_cols, 3.5 * n_rows), squeeze=False
+    )
     axes = axes.ravel()
 
     delta_vals = [-1.0, -0.5, 0.0, 0.5, 1.0]

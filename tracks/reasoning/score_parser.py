@@ -12,9 +12,11 @@ three score CSV files plus an errors CSV file:
     └── errors.csv
 
 Score CSV columns:
-    patient_id, item_text, behavioral_health, diagnoses, disabilities,
-    infectious_diseases, genetics, medications, sexual_reproductive_health,
-    social_determinants_of_health, violence, other, model_id, timestamp
+    patient_id, item_text, {one column per label-space key}, model_id, timestamp
+
+With the default label space the key columns are behavioral_health,
+diagnoses, disabilities, infectious_diseases, genetics, medications,
+sexual_reproductive_health, social_determinants_of_health, violence, other.
 
 Errors CSV columns:
     patient_id, item_text, condition, model_id, error_type, error_detail
@@ -27,13 +29,14 @@ from typing import Any
 
 import pandas as pd
 
+from shared.label_space import DEFAULT_LABEL_SPACE, LabelSpace
 from tracks.reasoning.llm_client import LLMClient
 from tracks.reasoning.response_cache import ResponseCache
 from tracks.reasoning.schema_validator import (
-    REQUIRED_KEYS,
     JSONParseError,
     MissingKeyError,
     RangeError,
+    normalize_category_key,
     validate_response,
 )
 
@@ -50,12 +53,14 @@ _CONDITION_TO_FILENAME: dict[str, str] = {
     "shuffled_context": "shuffled_context_scores.csv",
 }
 
-# CSV column order for score files
-_SCORE_COLUMNS: list[str] = (
-    ["patient_id", "item_text"]
-    + REQUIRED_KEYS
-    + ["model_id", "timestamp"]
-)
+
+def _score_columns(label_space: LabelSpace) -> list[str]:
+    """CSV column order for score files."""
+    return ["patient_id", "item_text", *label_space.keys(), "model_id", "timestamp"]
+
+
+# Column order with the default label space
+_SCORE_COLUMNS: list[str] = _score_columns(DEFAULT_LABEL_SPACE)
 
 # CSV column order for errors file
 _ERROR_COLUMNS: list[str] = [
@@ -90,6 +95,10 @@ class ScoreParser:
         rows are sorted by the order of ``(patient_id, item_text)`` in the
         dataset.  If ``None``, rows are sorted alphabetically by
         ``(patient_id, item_text)``.
+    label_space : LabelSpace, optional
+        Output dimensions to validate and write. Defaults to the paired
+        dataset's label space, or the ten SHARES categories when neither is
+        given.
     """
 
     def __init__(
@@ -97,10 +106,15 @@ class ScoreParser:
         cache_dir: str | Path,
         scores_dir: str | Path,
         paired_dataset: Any | None = None,
+        label_space: LabelSpace | None = None,
     ) -> None:
         self._cache_dir = Path(cache_dir)
         self._scores_dir = Path(scores_dir)
         self._paired_dataset = paired_dataset
+        dataset_space = getattr(paired_dataset, "label_space", None)
+        if label_space is None and isinstance(dataset_space, LabelSpace):
+            label_space = dataset_space
+        self._label_space: LabelSpace = label_space or DEFAULT_LABEL_SPACE
 
     # ------------------------------------------------------------------
     # Public API
@@ -164,7 +178,7 @@ class ScoreParser:
         for cond in _CONDITIONS:
             filename = _CONDITION_TO_FILENAME[cond]
             out_path = output_dir / filename
-            df = pd.DataFrame(scores[cond], columns=_SCORE_COLUMNS)
+            df = pd.DataFrame(scores[cond], columns=_score_columns(self._label_space))
             df.to_csv(out_path, index=False)
             scores_written[cond] = len(df)
 
@@ -232,7 +246,7 @@ class ScoreParser:
 
         # Case 2: Attempt schema validation
         try:
-            validated: dict[str, float] = validate_response(raw_text)
+            validated: dict[str, float] = validate_response(raw_text, self._label_space)
         except (JSONParseError, MissingKeyError, RangeError) as exc:
             errors.append(
                 {
@@ -249,12 +263,10 @@ class ScoreParser:
         # Case 2b: Normalize keys to canonical form and detect duplicates.
         # validate_response() already returns canonical keys, but this guard
         # protects against future changes or alternative validators.
-        from tracks.reasoning.schema_validator import normalize_category_key
-
         normalized: dict[str, float] = {}
         for key, value in validated.items():
             try:
-                canon_key = normalize_category_key(key)
+                canon_key = normalize_category_key(key, self._label_space)
             except KeyError:
                 # Unknown key from validator — treat as error
                 errors.append(

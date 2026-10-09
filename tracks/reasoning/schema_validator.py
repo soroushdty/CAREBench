@@ -1,15 +1,16 @@
 """
 Schema Validator for the LLM Context-Shift Assay.
 
-Validates LLM JSON responses against the strict privacy category schema.
-Handles common LLM output artifacts (markdown code fences, surrounding text).
+Validates LLM JSON responses against the output dimensions of a label space
+(by default the ten SHARES categories). Handles common LLM output artifacts
+(markdown code fences, surrounding text).
 
 Raises:
     JSONParseError  — if json.loads fails
-    MissingKeyError — if any of the 10 required keys are absent
+    MissingKeyError — if any of the label space's keys are absent
     RangeError      — if any value is outside [0.0, 1.0]
 
-Returns a dict[str, float] with exactly 10 keys on success.
+Returns a dict[str, float] with exactly the label space's keys on success.
 """
 
 from __future__ import annotations
@@ -17,56 +18,31 @@ from __future__ import annotations
 import json
 import re
 
+from shared.label_space import DEFAULT_LABEL_SPACE, LabelSpace
 
 # ---------------------------------------------------------------------------
-# Required keys (canonical Privacy_Category names, glossary order)
+# Default label space (kept as module constants for backward compatibility)
 # ---------------------------------------------------------------------------
 
-REQUIRED_KEYS: list[str] = [
-    "behavioral_health",
-    "diagnoses",
-    "disabilities",
-    "infectious_diseases",
-    "genetics",
-    "medications",
-    "sexual_reproductive_health",
-    "social_determinants_of_health",
-    "violence",
-    "other",
-]
-
-# Set form for O(1) membership checks
-_REQUIRED_KEYS_SET: set[str] = set(REQUIRED_KEYS)
-
-
-# ---------------------------------------------------------------------------
-# Display-label ↔ canonical-key mappings
-# ---------------------------------------------------------------------------
+REQUIRED_KEYS: list[str] = DEFAULT_LABEL_SPACE.keys()
 
 DISPLAY_TO_CANONICAL: dict[str, str] = {
-    "Behavioral health": "behavioral_health",
-    "Diagnoses": "diagnoses",
-    "Disabilities": "disabilities",
-    "Infectious diseases": "infectious_diseases",
-    "Genetics": "genetics",
-    "Medications": "medications",
-    "Sexual and reproductive health": "sexual_reproductive_health",
-    "Social determinants of health": "social_determinants_of_health",
-    "Violence": "violence",
-    "Other": "other",
+    d.display_name: d.key for d in DEFAULT_LABEL_SPACE
 }
 
-CANONICAL_TO_DISPLAY: dict[str, str] = {v: k for k, v in DISPLAY_TO_CANONICAL.items()}
+CANONICAL_TO_DISPLAY: dict[str, str] = DEFAULT_LABEL_SPACE.manifest()
 
 
-def normalize_category_key(name: str) -> str:
-    """Normalize a display label or canonical key to canonical snake_case form.
+def normalize_category_key(name: str, label_space: LabelSpace | None = None) -> str:
+    """Normalize an exact display label or key to the key.
 
     Parameters
     ----------
     name : str
-        Either a human-readable display label (e.g. ``"Behavioral health"``)
-        or a canonical key (e.g. ``"behavioral_health"``).
+        Either a display label (e.g. ``"Behavioral health"``) or a key
+        (e.g. ``"behavioral_health"``).
+    label_space : LabelSpace, optional
+        Defaults to the ten SHARES categories.
 
     Returns
     -------
@@ -76,16 +52,18 @@ def normalize_category_key(name: str) -> str:
     Raises
     ------
     KeyError
-        If *name* is not a recognized display label or canonical key.
+        If *name* is not a display label or key of the label space.
     """
-    if name in DISPLAY_TO_CANONICAL:
-        return DISPLAY_TO_CANONICAL[name]
-    if name in _REQUIRED_KEYS_SET:
+    space = label_space or DEFAULT_LABEL_SPACE
+    dim = space.get(name)
+    if dim is not None and name == dim.key:
         return name
+    if name in space.display_names():
+        return space.key_for_display(name)
     raise KeyError(
         f"Unknown output-dimension name: {name!r}. "
-        f"Expected one of the canonical keys {REQUIRED_KEYS} "
-        f"or a display label from {list(DISPLAY_TO_CANONICAL.keys())}."
+        f"Expected one of the canonical keys {space.keys()} "
+        f"or a display label from {space.display_names()}."
     )
 
 
@@ -151,7 +129,9 @@ class RangeError(ValueError):
 # ---------------------------------------------------------------------------
 
 
-def validate_response(raw_text: str) -> dict[str, float]:
+def validate_response(
+    raw_text: str, label_space: LabelSpace | None = None
+) -> dict[str, float]:
     """Parse and validate an LLM JSON response.
 
     Processing steps:
@@ -159,32 +139,36 @@ def validate_response(raw_text: str) -> dict[str, float]:
     2. Strip markdown code fences (```json ... ``` or ``` ... ```).
     3. Extract the first ``{...}`` block if the response has surrounding text.
     4. Attempt ``json.loads``; raise :class:`JSONParseError` on failure.
-    5. Check all 10 required keys are present; raise :class:`MissingKeyError`
-       with the list of missing keys if any are absent.
+    5. Check all of the label space's keys are present; raise
+       :class:`MissingKeyError` with the list of missing keys if any are absent.
     6. Check all values are numeric (int or float) and in [0.0, 1.0]; raise
        :class:`RangeError` on the first violation found.
-    7. Return ``dict[str, float]`` with exactly the 10 required keys (values
-       cast to float).
+    7. Return ``dict[str, float]`` with exactly the label space's keys (values
+       cast to float). Extra keys in the response are ignored.
 
     Parameters
     ----------
     raw_text : str
         The raw text returned by the LLM.
+    label_space : LabelSpace, optional
+        The expected output dimensions. Defaults to the ten SHARES categories.
 
     Returns
     -------
     dict[str, float]
-        Validated score dictionary with exactly 10 Privacy_Category keys.
+        Validated score dictionary keyed by the label space's keys.
 
     Raises
     ------
     JSONParseError
         If the text cannot be parsed as JSON after cleaning.
     MissingKeyError
-        If any of the 10 required keys are absent from the parsed object.
+        If any required key is absent from the parsed object.
     RangeError
         If any value is not numeric or is outside [0.0, 1.0].
     """
+    required_keys = (label_space or DEFAULT_LABEL_SPACE).keys()
+
     # Step 1: strip leading/trailing whitespace
     text = raw_text.strip()
 
@@ -223,12 +207,12 @@ def validate_response(raw_text: str) -> dict[str, float]:
         raise JSONParseError(raw_text)
 
     # Step 5: check all required keys are present
-    missing_keys = [key for key in REQUIRED_KEYS if key not in parsed]
+    missing_keys = [key for key in required_keys if key not in parsed]
     if missing_keys:
         raise MissingKeyError(missing_keys)
 
     # Step 6: check all values are numeric and in [0.0, 1.0]
-    for key in REQUIRED_KEYS:
+    for key in required_keys:
         value = parsed[key]
         if not isinstance(value, (int, float)) or isinstance(value, bool):
             raise RangeError(key, value)
@@ -236,8 +220,8 @@ def validate_response(raw_text: str) -> dict[str, float]:
         if float_value < 0.0 or float_value > 1.0:
             raise RangeError(key, float_value)
 
-    # Step 7: return validated dict[str, float] with exactly the 10 required keys
-    return {key: float(parsed[key]) for key in REQUIRED_KEYS}
+    # Step 7: return validated dict[str, float] with exactly the required keys
+    return {key: float(parsed[key]) for key in required_keys}
 
 
 # ---------------------------------------------------------------------------

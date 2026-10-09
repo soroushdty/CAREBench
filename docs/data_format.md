@@ -76,7 +76,7 @@ Maps a canonical item string to the raw variants that appear in the workbook, so
 
 ## Label space
 
-The default categories are the ten sensitive-data categories used in the SHARES project (see [`adapters/paired_context/labels.py`](../adapters/paired_context/labels.py)). The reasoning track's prompt, response schema and scoring currently assume this ten-category taxonomy, so `classes` must list these ten display names.
+The default categories are the ten sensitive-data categories used in the SHARES project (see [`shared/label_space.py`](../shared/label_space.py)). Any other set of category columns works: list them in `classes`, and give the definitions the Track 3 prompt should show in `class_definitions` (see [`adapters.md`](adapters.md#label-space-sharedlabel_spacepy)).
 
 ## Pointing a run at your data
 

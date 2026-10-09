@@ -43,6 +43,8 @@ from tracks.reasoning.config_loader import (
     ConfigError,
     _validate_model_ids,
     load_config,
+    validate_label_space_config,
+    validate_prompt_config,
 )
 from tracks.reasoning.context_builder import ContextBuilder
 from tracks.reasoning.dataset_loader import DatasetLoader
@@ -229,6 +231,7 @@ def _load_score_array(
     patient_ids: np.ndarray,
     item_texts: np.ndarray,
     category_names: list[str],
+    label_space: Any | None = None,
 ) -> np.ndarray:
     """Load a score CSV and return an ``(N, D)`` numpy array aligned to the dataset.
 
@@ -246,6 +249,9 @@ def _load_score_array(
     category_names:
         List of D canonical output-dimension keys (e.g.
         ``["behavioral_health", "diagnoses", ...]``).
+    label_space:
+        :class:`~shared.label_space.LabelSpace` used to find legacy
+        display-name columns. Defaults to the ten SHARES categories.
 
     Returns
     -------
@@ -253,8 +259,9 @@ def _load_score_array(
         Shape ``(N, D)`` where ``D = len(category_names)``.
         Rows with no matching CSV entry are ``NaN``.
     """
-    from tracks.reasoning.schema_validator import DISPLAY_TO_CANONICAL
+    from shared.label_space import DEFAULT_LABEL_SPACE
 
+    space = label_space or DEFAULT_LABEL_SPACE
     n = len(patient_ids)
     d = len(category_names)
     result = np.full((n, d), np.nan, dtype=float)
@@ -281,11 +288,12 @@ def _load_score_array(
             col_map[cat] = cat
         else:
             # Attempt legacy display-label fallback
-            display_match: str | None = None
-            for display_label, canonical in DISPLAY_TO_CANONICAL.items():
-                if canonical == cat and display_label in df.columns:
-                    display_match = display_label
-                    break
+            dim = space.get(cat)
+            display_match: str | None = (
+                dim.display_name
+                if dim is not None and dim.display_name in df.columns
+                else None
+            )
             if display_match is not None:
                 logging.warning(
                     f"Score CSV {csv_path.name}: column '{display_match}' "
@@ -371,7 +379,7 @@ def _run_model(
 
     patient_ids = paired_dataset.patient_ids
     item_texts = paired_dataset.item_texts
-    category_names = paired_dataset.category_names
+    label_space = paired_dataset.label_space
     canonical_keys = paired_dataset.canonical_category_names
 
     # Build the list of all expected calls for this model
@@ -394,8 +402,8 @@ def _run_model(
     )
 
     # --- Step c: Run LLM calls (or load from cache) ---
-    client = LLMClient(cfg)
-    template = PromptTemplate()
+    client = LLMClient(cfg, label_space=label_space)
+    template = PromptTemplate.from_config(cfg.get("prompt"), label_space)
 
     total_pairs = len(patient_ids)
     batch_size = int(cfg.get("local_batch_size", 8)) if cfg["backend"] == "local_transformers" else 1
@@ -406,15 +414,15 @@ def _run_model(
 
     # Pre-scan cache and build the list of items that still need inference.
     # Collecting all pending work upfront allows batching across pairs and
-    # conditions instead of issuing one GPU call per item.
+    # conditions instead of issuing one GPU call per item. A cached response
+    # made with a different prompt (for example after changing the label
+    # space or the prompt settings) is stale and is run again.
     pending: list[dict[str, str]] = []
+    n_stale = 0
     for pid, itxt in zip(patient_ids, item_texts):
         pid_str = str(pid)
         itxt_str = str(itxt)
         for condition in _CONDITIONS:
-            cached = cache.get(model_id, condition, pid_str, itxt_str)
-            if cached is not None and cached.error is None:
-                continue
             if condition == "context_free":
                 prompt = template.build_context_free_prompt(itxt_str)
             elif condition == "correct_context":
@@ -423,6 +431,11 @@ def _run_model(
             else:
                 shuffled_ctx = shuffled_context_map.get((pid_str, itxt_str), "")
                 prompt = template.build_shuffled_context_prompt(itxt_str, shuffled_ctx)
+            cached = cache.get(model_id, condition, pid_str, itxt_str)
+            if cached is not None and cached.error is None:
+                if cached.prompt_hash == PromptTemplate.get_prompt_hash(prompt):
+                    continue
+                n_stale += 1
             pending.append({
                 "prompt": prompt,
                 "model_id": model_id,
@@ -431,6 +444,11 @@ def _run_model(
                 "item_text": itxt_str,
             })
 
+    if n_stale:
+        logging.warning(
+            f"  {n_stale} cached response(s) were made with a different prompt "
+            "and will be run again."
+        )
     n_pending = len(pending)
     logging.info(f"  {n_pending} items to infer ({total_pairs * len(_CONDITIONS) - n_pending} cached)")
 
@@ -472,18 +490,21 @@ def _run_model(
         patient_ids,
         item_texts,
         canonical_keys,
+        label_space,
     )
     correct_context_scores = _load_score_array(
         scores_model_dir / "correct_context_scores.csv",
         patient_ids,
         item_texts,
         canonical_keys,
+        label_space,
     )
     shuffled_context_scores = _load_score_array(
         scores_model_dir / "shuffled_context_scores.csv",
         patient_ids,
         item_texts,
         canonical_keys,
+        label_space,
     )
 
     # Handle case where score arrays might be all NaN (no valid responses)
@@ -591,7 +612,8 @@ def _run_model(
         h4_result=h4_result,
         model_id=model_id,
         run_timestamp=run_timestamp,
-        category_names=list(category_names),
+        label_space=label_space,
+        category_type=template.category_type,
         is_dry_run=(cfg.get("backend") == "dry_run"),
         n_context_entities=len(set(patient_ids.tolist())),
         n_task_pairs=len(patient_ids),
@@ -671,6 +693,8 @@ def _validate_config_dict(cfg: dict[str, Any]) -> dict[str, Any]:
             f"{', '.join(missing_data)}"
         )
 
+    validate_label_space_config(data_section)
+    validate_prompt_config(cfg.get("prompt"))
     return cfg
 
 
@@ -801,6 +825,14 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         logging.error(f"Failed to load dataset: {exc}")
         return 1
+
+    undefined = [d.key for d in paired_dataset.label_space if not d.definition]
+    if undefined:
+        logging.warning(
+            "No definition for output dimension(s) %s; the prompt lists them by key "
+            "only. Add them to data.class_definitions to describe them to the model.",
+            undefined,
+        )
 
     n_pairs = len(paired_dataset.patient_ids)
     logging.info(f"Dataset loaded: {n_pairs} patient-item pairs")

@@ -66,6 +66,8 @@ class PairedContextRepresentationAdapter:
             - ``patient_col``, ``physician_col``, ``item_col``,
               ``physician_count``: see ``PairedContextColumnMap.from_config``
             - ``classes``: output-dimension column names
+            - ``class_definitions`` (optional): keys per class (see
+              :meth:`shared.label_space.LabelSpace.from_config`)
             - ``llm``, ``batch_size``: item embedding model and batch size
             - ``DIR_CONTEXT`` (optional): patient summaries JSON for Stage 2
             - ``PROJECT_ROOT`` (optional): base for relative paths
@@ -79,13 +81,16 @@ class PairedContextRepresentationAdapter:
         """
         from adapters.paired_context.column_map import PairedContextColumnMap
         from adapters.paired_context.dataset_adapter import PairedContextDatasetAdapter
-        from adapters.paired_context import labels as paired_context_labels
         from shared.embeddings.compute_embeddings import compute_embeddings
+        from shared.label_space import LabelSpace
         from shared.preprocessing.preprocessing import preprocess
 
         project_root = Path(config.get("PROJECT_ROOT", ".")).resolve()
         dataset_path = _resolve(project_root, config["DIR_DATASET"])
         output_dimensions = list(config["classes"])
+        label_space = LabelSpace.from_config(
+            output_dimensions, config.get("class_definitions")
+        )
         column_map = PairedContextColumnMap.from_config(
             {
                 "patient_col": config.get("patient_col"),
@@ -106,6 +111,7 @@ class PairedContextRepresentationAdapter:
             dataset_path=dataset_path,
             class_cols=output_dimensions,
             column_map=column_map,
+            label_space=label_space,
         ).load_sheets()
 
         logger.info("Starting preprocessing...")
@@ -182,10 +188,7 @@ class PairedContextRepresentationAdapter:
                     "test": column_map.context_free_sheet,
                     "interview": column_map.correct_context_sheet,
                 },
-                "label_space": {
-                    paired_context_labels.normalize_output_dimension(name): name
-                    for name in output_dimensions
-                },
+                "label_space": label_space.manifest(),
             },
         )
 

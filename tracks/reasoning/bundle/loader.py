@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 from tracks.reasoning.schema_validator import (
     DISPLAY_TO_CANONICAL,
     REQUIRED_KEYS as CANONICAL_CATEGORIES,
-    normalize_category_key,
 )
 
 # Standard Excel column names → canonical snake_case (re-exported alias)
@@ -33,19 +32,6 @@ _EXCEL_TO_CANONICAL: dict[str, str] = DISPLAY_TO_CANONICAL
 
 # Standard Excel class column names (for DatasetLoader cfg)
 _DEFAULT_EXCEL_CLASSES: list[str] = list(_EXCEL_TO_CANONICAL.keys())
-
-
-def _to_canonical(name: str) -> str:
-    """Normalize an Excel category name to canonical snake_case.
-
-    Delegates to :func:`tracks.reasoning.schema_validator.normalize_category_key`
-    for known names; falls back to generic lowercasing for unknown names.
-    """
-    try:
-        return normalize_category_key(name)
-    except KeyError:
-        # Fallback for unknown names: generic normalization
-        return name.lower().replace(" ", "_").replace("-", "_")
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +48,7 @@ def load_physician_consensus(
     survey_sheet: str = "test",
     interview_sheet: str = "interview",
     excel_classes: Optional[List[str]] = None,
+    class_definitions: Optional[dict] = None,
 ) -> pd.DataFrame:
     """Load physician survey and interview consensus from dataset.xlsx.
 
@@ -88,6 +75,9 @@ def load_physician_consensus(
     excel_classes:
         List of category column names as they appear in the Excel file.
         Defaults to the standard 10-class names (e.g. "Behavioral health").
+    class_definitions:
+        Optional keys per class (the assay config's ``data.class_definitions``),
+        as accepted by :meth:`shared.label_space.LabelSpace.from_config`.
 
     Returns
     -------
@@ -108,6 +98,7 @@ def load_physician_consensus(
             "physician_col": physician_col,
             "item_col": item_col,
             "classes": classes,
+            "class_definitions": class_definitions,
             "train_sheet": train_sheet,
             "test_sheet": survey_sheet,
             "interview_sheet": interview_sheet,
@@ -117,8 +108,8 @@ def load_physician_consensus(
     loader = DatasetLoader(cfg, dataset_path=dataset_path)
     paired = loader.load()
 
-    # Normalize category names to canonical snake_case
-    canonical_cats = [_to_canonical(c) for c in paired.category_names]
+    # Category keys from the dataset's label space
+    canonical_cats = paired.canonical_category_names
 
     rows: list[dict] = []
     for i, (pid, itext) in enumerate(zip(paired.patient_ids, paired.item_texts)):

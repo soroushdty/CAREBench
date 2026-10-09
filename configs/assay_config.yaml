@@ -30,6 +30,14 @@ permutation_seed: 42
 n_bootstrap_resamples: 1000
 n_permutations: 10000
 
+# Prompt wording (optional). Defaults shown; change them for a taxonomy that
+# is not about privacy. category_type is the word before "categories" in the
+# prompt and the reports ("" for none). A changed prompt invalidates the
+# matching cached responses, which are then run again.
+# prompt:
+#   intro: "You are a clinical privacy expert. Classify the following EHR item into privacy categories."
+#   category_type: privacy
+
 # Label leakage checking: set to true to skip validation (useful for datasets with known leakage issues)
 skip_label_leakage_check: false
 
@@ -47,6 +55,12 @@ data:
   patient_col: Patient
   physician_col: Physician
   item_col: Item
+  # Output dimensions: one workbook column per class. Classes with these
+  # default names get their key and prompt definition from
+  # shared/label_space.py. For other classes, add class_definitions:
+  #   class_definitions:
+  #     Housing: Housing instability or homelessness
+  #     Drug therapy: {key: medications, definition: Any prescribed drug}
   classes:
     - Behavioral health
     - Diagnoses

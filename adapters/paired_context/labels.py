@@ -1,8 +1,12 @@
 """Default output-dimension label space.
 
-Defines the default list of 10 sensitive-data output dimensions used by
-CAREBench (the taxonomy used in the SHARES project). Provides helpers for
-normalization, display↔key lookups, and manifest generation.
+Thin wrapper around :data:`shared.label_space.DEFAULT_LABEL_SPACE`, the ten
+sensitive-data categories used in the SHARES project. Provides helpers for
+normalization, display<->key lookups, and manifest generation.
+
+Datasets with a different taxonomy configure it with ``classes`` and
+``class_definitions`` (see ``docs/adapters.md``) and use a
+:class:`shared.label_space.LabelSpace` built from config instead.
 
 Canonical path: adapters/paired_context/labels.py
 
@@ -12,149 +16,68 @@ human-readable form as it appears in reports and configs.
 
 from __future__ import annotations
 
-
-# ---------------------------------------------------------------------------
-# Authoritative label registry: (canonical_key, display_name)
-# ---------------------------------------------------------------------------
-
-_LABEL_REGISTRY: tuple[tuple[str, str], ...] = (
-    ("behavioral_health", "Behavioral health"),
-    ("diagnoses", "Diagnoses"),
-    ("disabilities", "Disabilities"),
-    ("infectious_diseases", "Infectious diseases"),
-    ("genetics", "Genetics"),
-    ("medications", "Medications"),
-    ("sexual_reproductive_health", "Sexual and reproductive health"),
-    ("social_determinants_of_health", "Social determinants of health"),
-    ("violence", "Violence"),
-    ("other", "Other"),
+from shared.label_space import (
+    DEFAULT_LABEL_SPACE,
+    LabelSpace,
+    UnknownOutputDimensionError,
 )
 
-# Pre-computed lookup dicts (built at import time from the immutable registry)
-_KEY_TO_DISPLAY: dict[str, str] = {k: d for k, d in _LABEL_REGISTRY}
-_DISPLAY_TO_KEY: dict[str, str] = {d: k for k, d in _LABEL_REGISTRY}
-# Normalized lookup: lowercased display names → key (for fuzzy matching)
-_DISPLAY_LOWER_TO_KEY: dict[str, str] = {d.lower(): k for k, d in _LABEL_REGISTRY}
-
-
-# ---------------------------------------------------------------------------
-# Exceptions
-# ---------------------------------------------------------------------------
-
-
-class UnknownOutputDimensionError(ValueError):
-    """Raised when an unrecognized output dimension is supplied."""
-
-    def __init__(self, value: str) -> None:
-        valid_keys = ", ".join(k for k, _ in _LABEL_REGISTRY)
-        valid_displays = ", ".join(d for _, d in _LABEL_REGISTRY)
-        super().__init__(
-            f"Unknown output dimension: {value!r}. "
-            f"Valid keys: [{valid_keys}]. "
-            f"Valid display names: [{valid_displays}]."
-        )
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
+__all__ = [
+    "DEFAULT_LABEL_SPACE",
+    "LabelSpace",
+    "UnknownOutputDimensionError",
+    "display_for_key",
+    "display_names",
+    "key_for_display",
+    "keys",
+    "label_manifest",
+    "normalize_output_dimension",
+]
 
 
 def keys() -> list[str]:
     """Return canonical machine keys in registry order."""
-    return [k for k, _ in _LABEL_REGISTRY]
+    return DEFAULT_LABEL_SPACE.keys()
 
 
 def display_names() -> list[str]:
     """Return human-readable display names in registry order."""
-    return [d for _, d in _LABEL_REGISTRY]
+    return DEFAULT_LABEL_SPACE.display_names()
 
 
 def key_for_display(display_name: str) -> str:
-    """Return the canonical key for a given display name.
-
-    Parameters
-    ----------
-    display_name : str
-        A valid display name (case-sensitive).
-
-    Returns
-    -------
-    str
-        The canonical machine key.
+    """Return the canonical key for a (case-sensitive) display name.
 
     Raises
     ------
     UnknownOutputDimensionError
         If the display name is not recognized.
     """
-    result = _DISPLAY_TO_KEY.get(display_name)
-    if result is None:
-        raise UnknownOutputDimensionError(display_name)
-    return result
+    return DEFAULT_LABEL_SPACE.key_for_display(display_name)
 
 
 def display_for_key(key: str) -> str:
-    """Return the display name for a given canonical key.
-
-    Parameters
-    ----------
-    key : str
-        A valid canonical machine key.
-
-    Returns
-    -------
-    str
-        The human-readable display name.
+    """Return the display name for a canonical key.
 
     Raises
     ------
     UnknownOutputDimensionError
         If the key is not recognized.
     """
-    result = _KEY_TO_DISPLAY.get(key)
-    if result is None:
-        raise UnknownOutputDimensionError(key)
-    return result
+    return DEFAULT_LABEL_SPACE.display_for_key(key)
 
 
 def normalize_output_dimension(value: str) -> str:
-    """Normalize a value (key or display name) to the canonical key.
-
-    Accepts either a canonical key or a display name (case-insensitive for
-    display names) and returns the canonical machine key.
-
-    Parameters
-    ----------
-    value : str
-        Either a canonical key or a display name.
-
-    Returns
-    -------
-    str
-        The canonical machine key.
+    """Normalize a key or display name (case-insensitive) to the canonical key.
 
     Raises
     ------
     UnknownOutputDimensionError
         If the value is neither a valid key nor a valid display name.
     """
-    # Direct key match
-    if value in _KEY_TO_DISPLAY:
-        return value
-
-    # Direct display name match (case-sensitive)
-    if value in _DISPLAY_TO_KEY:
-        return _DISPLAY_TO_KEY[value]
-
-    # Case-insensitive display name match
-    lower_val = value.lower()
-    if lower_val in _DISPLAY_LOWER_TO_KEY:
-        return _DISPLAY_LOWER_TO_KEY[lower_val]
-
-    raise UnknownOutputDimensionError(value)
+    return DEFAULT_LABEL_SPACE.normalize(value)
 
 
 def label_manifest() -> dict[str, str]:
-    """Return a key→display mapping suitable for inclusion in run manifests."""
-    return dict(_KEY_TO_DISPLAY)
+    """Return a key->display mapping suitable for inclusion in run manifests."""
+    return DEFAULT_LABEL_SPACE.manifest()

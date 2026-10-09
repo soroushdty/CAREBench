@@ -18,11 +18,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from shared.label_space import DEFAULT_LABEL_SPACE, LabelSpace
 from tracks.reasoning.prompt_template import PromptTemplate
 from tracks.reasoning.schema_validator import (
     JSONParseError,
     MissingKeyError,
-    REQUIRED_KEYS,
     RangeError,
     validate_response,
 )
@@ -105,9 +105,9 @@ class FailedCall:
 # Dry-run mock response
 # ---------------------------------------------------------------------------
 
-def _build_dry_run_response() -> str:
-    """Return a deterministic JSON string with all 10 categories set to 0.5."""
-    mock = {key: 0.5 for key in REQUIRED_KEYS}
+def _build_dry_run_response(label_space: LabelSpace | None = None) -> str:
+    """Return a deterministic JSON string with every category set to 0.5."""
+    mock = {d.key: 0.5 for d in (label_space or DEFAULT_LABEL_SPACE)}
     return json.dumps(mock)
 
 
@@ -141,10 +141,16 @@ class LLMClient:
           - ``seed``             : int
           - ``hf_token``         : str (optional, direct token)
           - ``hf_token_env``     : str (optional, env var name for token)
+    label_space : LabelSpace, optional
+        Output dimensions responses are validated against (and the dry-run
+        mock returns). Defaults to the ten SHARES categories.
     """
 
-    def __init__(self, cfg: dict[str, Any]) -> None:
+    def __init__(
+        self, cfg: dict[str, Any], label_space: LabelSpace | None = None
+    ) -> None:
         self._cfg = cfg
+        self._label_space: LabelSpace = label_space or DEFAULT_LABEL_SPACE
         self._backend: str = cfg["backend"]
         self._retry_limit: int = int(cfg["retry_limit"])
         self._temperature: float = float(cfg.get("temperature", 0.0))
@@ -353,7 +359,7 @@ class LLMClient:
         timestamp: str,
     ) -> LLMResponse:
         """Return a deterministic mock response without any external calls."""
-        raw_text = _build_dry_run_response()
+        raw_text = _build_dry_run_response(self._label_space)
         return LLMResponse(
             raw_text=raw_text,
             model_id=model_id,
@@ -478,7 +484,7 @@ class LLMClient:
         # apply_chat_template kwargs (e.g. enable_thinking=False) — would
         # eliminate the need for an inflated max_tokens budget.
         try:
-            validate_response(raw_text)
+            validate_response(raw_text, self._label_space)
         except (JSONParseError, MissingKeyError, RangeError) as exc:
             err = f"SchemaValidationFailed: {exc}"
             self._failed_calls.append(FailedCall(
@@ -645,7 +651,7 @@ class LLMClient:
         # apply_chat_template kwargs (e.g. enable_thinking=False) — would
         # eliminate the need for an inflated max_tokens budget.
         try:
-            validate_response(raw_text)
+            validate_response(raw_text, self._label_space)
         except (JSONParseError, MissingKeyError, RangeError) as exc:
             err = f"SchemaValidationFailed: {exc}"
             self._failed_calls.append(FailedCall(
@@ -749,7 +755,7 @@ class LLMClient:
             }
 
             try:
-                validate_response(raw_text)
+                validate_response(raw_text, self._label_space)
                 error: str | None = None
             except (JSONParseError, MissingKeyError, RangeError) as exc:
                 error = f"SchemaValidationFailed: {exc}"

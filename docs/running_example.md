@@ -80,8 +80,8 @@ Under `output/assay/<run_id>/`:
 | Symptom | Likely cause | Remedy |
 |---------|-------------|--------|
 | `FileNotFoundError` for the dataset | Dataset file missing | Put the dataset at the path declared in config, or update the config path |
-| `KeyError` on a privacy category | Label mismatch between config and adapter | Check that the `classes` in the config match `adapters/paired_context/labels.py`; run the label tests |
+| `KeyError` or `Invalid label space` on a category | `classes` and `class_definitions` disagree, or two classes map to the same key | Check that every `class_definitions` entry names a class in `classes` and that keys are unique snake_case (`docs/adapters.md`) |
 | `LabelLeakageError` | An item's text appears in its own patient's snapshot | Reword the snapshot, or set `skip_label_leakage_check: true` if this is intended |
 | Score CSV has zero rows | Dataset loading silently dropped rows | Check `adapter_manifest.json` for row counts; enable verbose logging |
-| All-NaN score column | Category name mismatch | Check that the canonical keys in the config match `adapters/paired_context/labels.py` |
+| All-NaN score column | Score files written with a different label space | Re-parse the cached responses with the current config, or check that the score CSV columns match the keys in `adapter_manifest.json` |
 | `ConfigError: Missing required...` | Config YAML incomplete | Compare against `configs/assay_config.yaml` for required keys |

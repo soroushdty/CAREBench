@@ -24,22 +24,13 @@ import math
 import os
 from typing import Any
 
+from shared.label_space import DEFAULT_LABEL_SPACE, LabelSpace
+
 # ---------------------------------------------------------------------------
 # Default category names (canonical order)
 # ---------------------------------------------------------------------------
 
-DEFAULT_CATEGORY_NAMES: list[str] = [
-    "behavioral_health",
-    "diagnoses",
-    "disabilities",
-    "infectious_diseases",
-    "genetics",
-    "medications",
-    "sexual_reproductive_health",
-    "social_determinants_of_health",
-    "violence",
-    "other",
-]
+DEFAULT_CATEGORY_NAMES: list[str] = DEFAULT_LABEL_SPACE.keys()
 
 
 def _fmt(value: Any, decimals: int = 4) -> str:
@@ -104,13 +95,20 @@ class ReportGenerator:
     run_timestamp:
         ISO 8601 timestamp string for the run.
     category_names:
-        List of 10 output_dimension names.  Defaults to the canonical
-        10-category list if not provided.
+        output_dimension keys, matching the keys of the per-category
+        results. Ignored when ``label_space`` is given. Defaults to the keys
+        of the ten SHARES categories.
     h2_per_category:
         Optional dict mapping output_dimension name → dict with
         ``sign_agreement_rate``, ``ci_lower``, ``ci_upper``.
         If ``None``, the per-category H2 section notes that the
         breakdown is not available.
+    label_space:
+        Optional :class:`~shared.label_space.LabelSpace`. Results are looked
+        up by its keys and tables show its display names.
+    category_type:
+        Word placed before "categories" in the report text (the assay
+        config's ``prompt.category_type``; ``""`` for none).
     """
 
     def __init__(
@@ -126,6 +124,8 @@ class ReportGenerator:
         is_dry_run: bool = False,
         n_context_entities: int | None = None,
         n_task_pairs: int | None = None,
+        label_space: LabelSpace | None = None,
+        category_type: str = "privacy",
     ) -> None:
         self._h1 = h1_result
         self._h2 = h2_result
@@ -133,10 +133,16 @@ class ReportGenerator:
         self._h4 = h4_result
         self._model_id = model_id  # candidate_id
         self._run_timestamp = run_timestamp
-        self._category_names: list[str] = (
-            list(category_names) if category_names is not None else DEFAULT_CATEGORY_NAMES
-        )
+        if label_space is not None:
+            self._category_names: list[str] = label_space.keys()
+            self._category_labels: list[str] = label_space.display_names()
+        else:
+            self._category_names = (
+                list(category_names) if category_names is not None else DEFAULT_CATEGORY_NAMES
+            )
+            self._category_labels = list(self._category_names)
         self._h2_per_category = h2_per_category
+        self._category_type = category_type.strip()
         self._is_dry_run = is_dry_run
         self._n_context_entities = n_context_entities
         self._n_task_pairs = n_task_pairs
@@ -184,6 +190,14 @@ class ReportGenerator:
             return "patients"
         return f"**{self._n_context_entities} patients**"
 
+    def _categories(self) -> str:
+        """``"privacy categories"``, or ``"categories"`` with no category type."""
+        return f"{self._category_type} categories" if self._category_type else "categories"
+
+    def _category_adjective(self) -> str:
+        """``"privacy-category"``, or ``"category"`` with no category type."""
+        return f"{self._category_type}-category" if self._category_type else "category"
+
     def _cohort_sentence(self) -> str:
         if self._n_context_entities is None:
             return ""
@@ -220,7 +234,7 @@ class ReportGenerator:
             "and a context-aware interview phase (reference_correct_context). "
             f"{self._cohort_sentence()}"
             "Reference observers assessed items (task_instance) across "
-            f"{len(self._category_names)} privacy categories (output_dimension), yielding "
+            f"{len(self._category_names)} {self._categories()} (output_dimension), yielding "
             "paired consensus labels (Physician_Survey_Consensus and "
             "Physician_Interview_Consensus). The physician judgment delta "
             "(delta_reference) is defined as the interview consensus minus the survey "
@@ -236,7 +250,7 @@ class ReportGenerator:
             "3. **Shuffled-context:** item text with a randomly selected *different* "
             "patient's clinical snapshot (control condition).\n\n"
             "The LLM outputs a JSON object with probability scores (0–1) for each of "
-            "the privacy categories (output_dimension). Delta_LLM_Correct is "
+            f"the {self._categories()} (output_dimension). Delta_LLM_Correct is "
             "defined as the correct-context score minus the context-free score. "
             "Delta_LLM_Shuffled is defined as the shuffled-context score minus the "
             "context-free score.\n\n"
@@ -275,7 +289,7 @@ class ReportGenerator:
 
         lines = [
             "### H1 — Context Sensitivity\n",
-            "**Hypothesis:** The LLM (candidate_id) changes its privacy-category "
+            f"**Hypothesis:** The LLM (candidate_id) changes its {self._category_adjective()} "
             "scores (output_dimension) when patient context (context_entity_id) "
             "is added (mean absolute Delta_LLM_Correct > 0).\n",
             f"- **Aggregate mean absolute delta:** {point}  ",
@@ -286,11 +300,11 @@ class ReportGenerator:
         ]
 
         per_cat: dict[str, Any] = h1.get("per_category", {})
-        for cat in self._category_names:
+        for cat, label in zip(self._category_names, self._category_labels):
             cat_data = per_cat.get(cat, {})
             cat_point = _fmt(cat_data.get("mean_abs_delta"))
             cat_ci = _fmt_ci(cat_data.get("ci_lower"), cat_data.get("ci_upper"))
-            lines.append(f"| {cat} | {cat_point} | {cat_ci} |")
+            lines.append(f"| {label} | {cat_point} | {cat_ci} |")
 
         return "\n".join(lines)
 
@@ -318,11 +332,11 @@ class ReportGenerator:
                 "| Category | Sign Agreement Rate | 95% CI |",
                 "|---|---|---|",
             ]
-            for cat in self._category_names:
+            for cat, label in zip(self._category_names, self._category_labels):
                 cat_data = self._h2_per_category.get(cat, {})
                 rate = _fmt(cat_data.get("sign_agreement_rate"))
                 cat_ci = _fmt_ci(cat_data.get("ci_lower"), cat_data.get("ci_upper"))
-                lines.append(f"| {cat} | {rate} | {cat_ci} |")
+                lines.append(f"| {label} | {rate} | {cat_ci} |")
         else:
             lines.append(
                 "*Per-category H2 breakdown not available in the current implementation. "
@@ -342,8 +356,8 @@ class ReportGenerator:
 
         lines = [
             "### H3 — Class-Level Correspondence\n",
-            "**Hypothesis:** The pattern of LLM context effects across privacy "
-            "categories (output_dimension) correlates with the pattern of "
+            "**Hypothesis:** The pattern of LLM context effects across "
+            f"{self._categories()} (output_dimension) correlates with the pattern of "
             "reference_observer judgment shifts (delta_reference) "
             "(Pearson r of class-level mean deltas).\n",
             f"- **Pearson r:** {r_val}  ",
@@ -353,7 +367,7 @@ class ReportGenerator:
             "|---|---|---|",
         ]
 
-        for i, cat in enumerate(self._category_names):
+        for i, cat in enumerate(self._category_labels):
             dp_val = "N/A"
             dl_val = "N/A"
             try:

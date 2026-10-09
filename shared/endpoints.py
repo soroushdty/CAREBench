@@ -28,7 +28,8 @@ class Endpoint:
 CONTEXT_SENSITIVITY = Endpoint(
     "context_sensitivity",
     "Context sensitivity",
-    "Does adding patient context change the model's scores?",
+    "Does the correct patient's context change the model's scores more than "
+    "another patient's context does?",
 )
 DIRECTIONAL_ALIGNMENT = Endpoint(
     "directional_alignment",

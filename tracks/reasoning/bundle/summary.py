@@ -79,6 +79,8 @@ def make_hypothesis_summary(
 
         context_sensitivity_mean_abs_delta_correct = _agg(h1_c, "mean_abs_delta_correct")
         context_sensitivity_mean_abs_delta_shuffled = _agg(h1_c, "mean_abs_delta_shuffled")
+        context_sensitivity_mean_abs_delta_difference = _agg(h1_c, "mean_abs_delta_difference")
+        context_sensitivity_p_value = _agg(h1_c, "paired_permutation_p")
         context_sensitivity_proportion_changed_correct = _agg(h1_c, "proportion_changed_correct")
         context_sensitivity_proportion_changed_shuffled = _agg(h1_c, "proportion_changed_shuffled")
 
@@ -86,6 +88,8 @@ def make_hypothesis_summary(
         directional_alignment_mean_alignment_shuffled = _agg(h2_c, "mean_alignment_shuffled")
         directional_alignment_sign_agreement_correct = _agg(h2_c, "sign_agreement_correct")
         directional_alignment_sign_agreement_shuffled = _agg(h2_c, "sign_agreement_shuffled")
+        directional_alignment_null_sign_agreement = _agg(h2_c, "null_sign_agreement_correct")
+        directional_alignment_p_value = _agg(h2_c, "permutation_p_correct")
 
         def _h3val(col):
             if h3_model.empty or col not in h3_model.columns:
@@ -119,12 +123,16 @@ def make_hypothesis_summary(
                 "n_physician_shift_cells": n_shift,
                 "context_sensitivity_mean_abs_delta_correct": context_sensitivity_mean_abs_delta_correct,
                 "context_sensitivity_mean_abs_delta_shuffled": context_sensitivity_mean_abs_delta_shuffled,
+                "context_sensitivity_mean_abs_delta_difference": context_sensitivity_mean_abs_delta_difference,
+                "context_sensitivity_p_value": context_sensitivity_p_value,
                 "context_sensitivity_proportion_changed_correct": context_sensitivity_proportion_changed_correct,
                 "context_sensitivity_proportion_changed_shuffled": context_sensitivity_proportion_changed_shuffled,
                 "directional_alignment_mean_alignment_correct": directional_alignment_mean_alignment_correct,
                 "directional_alignment_mean_alignment_shuffled": directional_alignment_mean_alignment_shuffled,
                 "directional_alignment_sign_agreement_correct": directional_alignment_sign_agreement_correct,
                 "directional_alignment_sign_agreement_shuffled": directional_alignment_sign_agreement_shuffled,
+                "directional_alignment_null_sign_agreement": directional_alignment_null_sign_agreement,
+                "directional_alignment_p_value": directional_alignment_p_value,
                 "class_correspondence_pearson_correct": class_correspondence_pearson_correct,
                 "class_correspondence_spearman_correct": class_correspondence_spearman_correct,
                 "class_correspondence_pearson_shuffled": class_correspondence_pearson_shuffled,

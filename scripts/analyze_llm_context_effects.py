@@ -399,8 +399,14 @@ def main(argv: list[str] | None = None) -> None:
         logger.info("  Model: %s", model)
         model_cells = cells_df[cells_df["model"] == model].copy()
 
-        h1 = compute_h1(model_cells, model, categories, args.epsilon, args.n_bootstrap, args.seed)
-        h2 = compute_h2(model_cells, model, categories, args.epsilon, args.n_bootstrap, args.seed)
+        h1 = compute_h1(
+            model_cells, model, categories, args.epsilon, args.n_bootstrap, args.seed,
+            n_permutations=args.n_permutations,
+        )
+        h2 = compute_h2(
+            model_cells, model, categories, args.epsilon, args.n_bootstrap, args.seed,
+            n_permutations=args.n_permutations,
+        )
         h3_eff, h3_corr = compute_h3(model_cells, model, categories, args.n_permutations, args.seed)
         h4 = compute_h4(model_cells, model, categories, args.n_bootstrap, args.n_permutations, args.seed)
 

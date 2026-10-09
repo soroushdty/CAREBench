@@ -564,12 +564,23 @@ def _run_model(
     subset_dataset = _SubsetDataset(valid_patient_ids, list(canonical_keys))
     analyzer = HypothesisAnalyzer(subset_dataset, cfg)
 
-    h1_result = analyzer.compute_h1(cf_scores, cc_scores)
-    logging.info(f"Context sensitivity (mean |delta|): {h1_result['mean_abs_delta']:.4f}")
+    # Shuffled context is the reference for context sensitivity and
+    # directional alignment; rows with invalid shuffled scores are dropped
+    # inside the analyzer for those statistics only.
+    sc_scores_cf_cc = shuffled_context_scores[valid_mask_cf_cc] if has_shuffled else None
 
-    h2_result = analyzer.compute_h2(cf_scores, cc_scores, delta_phys)
+    h1_result = analyzer.compute_h1(cf_scores, cc_scores, sc_scores_cf_cc)
     logging.info(
-        f"Directional alignment (sign agreement rate): {h2_result['sign_agreement_rate']:.4f}"
+        f"Context sensitivity (mean |delta|): correct {h1_result['mean_abs_delta']:.4f}, "
+        f"shuffled {h1_result['mean_abs_delta_shuffled']:.4f}, "
+        f"p = {h1_result['p_value']:.4f}"
+    )
+
+    h2_result = analyzer.compute_h2(cf_scores, cc_scores, delta_phys, sc_scores_cf_cc)
+    logging.info(
+        f"Directional alignment (sign agreement rate): {h2_result['sign_agreement_rate']:.4f}, "
+        f"chance {h2_result['null_sign_agreement_rate']:.4f}, "
+        f"p = {h2_result['p_value']:.4f}"
     )
 
     h3_result = analyzer.compute_h3(cf_scores, cc_scores, delta_phys)

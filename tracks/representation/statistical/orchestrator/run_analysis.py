@@ -22,7 +22,7 @@ _OUTPUTS = {
     "tau_robustness.csv":      "τ=0.5 vs F1-optimal robustness check",
     "directional_alignment_per_class.csv": "Directional alignment (formerly H1) per class",
     "directional_alignment_pooled.json":   "Directional alignment pooled over classes (permutation test)",
-    "directional_alignment_cmh.json":      "Directional alignment across classes (CMH, cluster p-value)",
+    "directional_alignment_cmh.json":      "Directional alignment across classes (CMH, permutation p-value)",
     "brier_improvement_per_class.csv":     "Brier improvement (formerly H2) per class",
     "brier_improvement_summary.json":      "Brier improvement macro-average summary",
     "wasserstein_distance.csv":            "Per-class Wasserstein distance to the label distribution",
@@ -304,6 +304,10 @@ def run_statistical_analysis(
     # Separate generator for the patient-cluster sign-flip tests, so they do
     # not consume draws from ``rng`` (whose sequence drives every bootstrap CI).
     perm_rng = np.random.default_rng(int(cfg.get("global_seed", 42)) + 1)
+    # And one for the within-patient permutation nulls of directional
+    # alignment, so they leave the sign-flip draws (used by Brier
+    # improvement) unchanged.
+    null_rng = np.random.default_rng(int(cfg.get("global_seed", 42)) + 2)
     fig_dpi = int(stat_cfg.get("figure_dpi", 150))
 
     patient_col = cfg.get("patient_col", "Patient")
@@ -387,7 +391,7 @@ def run_statistical_analysis(
     h1_df = h1_binomial_per_class(
         delta_p, delta_m, class_list, eligible_classes,
         patient_ids, n_resamples, rng,
-        n_permutations=n_permutations, perm_rng=perm_rng,
+        n_permutations=n_permutations, perm_rng=perm_rng, null_rng=null_rng,
     )
     _save_csv(output_dir / "directional_alignment_per_class.csv", h1_df)
     logger.info(
@@ -418,11 +422,12 @@ def run_statistical_analysis(
     h1_cmh = h1_cmh_test(
         delta_p, delta_m, eligible_classes, class_list,
         patient_ids=patient_ids, n_permutations=n_permutations, perm_rng=perm_rng,
+        null_rng=null_rng,
     )
     _save_json(output_dir / "directional_alignment_cmh.json", h1_cmh)
     logger.info(
-        "Directional alignment CMH: OR=%.3f, p=%.4f, cluster p=%.4f",
-        h1_cmh["common_odds_ratio"], h1_cmh["p_cmh"], h1_cmh["p_cluster"],
+        "Directional alignment CMH: OR=%.3f, p=%.4f, permutation p=%.4f",
+        h1_cmh["common_odds_ratio"], h1_cmh["p_cmh"], h1_cmh["p_permutation"],
     )
 
     # ------------------------------------------------------------------

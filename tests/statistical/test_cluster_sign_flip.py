@@ -106,7 +106,7 @@ def _track1_inputs():
     return dp, dm, pids, classes
 
 
-def test_h1_per_class_bh_uses_cluster_p():
+def test_h1_per_class_bh_uses_perm_p():
     from tracks.representation.statistical.hypotheses.h1 import (
         _bh_correct,
         h1_binomial_per_class,
@@ -114,18 +114,64 @@ def test_h1_per_class_bh_uses_cluster_p():
 
     dp, dm, pids, classes = _track1_inputs()
     df = h1_binomial_per_class(dp, dm, classes, classes, pids, n_resamples=50,
-                               rng=np.random.default_rng(1))
-    assert {"binom_p", "cluster_p", "bh_adj_p"} <= set(df.columns)
-    # 2**8 = 256 patterns -> exact; all 8 patients agree, so p = 1/256.
+                               rng=np.random.default_rng(1),
+                               n_permutations=999, null_rng=np.random.default_rng(2))
+    assert {"null_rate", "perm_p", "binom_p", "cluster_p", "bh_adj_p"} <= set(df.columns)
+    # Reference sign-flip test: 2**8 = 256 patterns -> exact; all 8 patients
+    # agree, so p = 1/256.
     assert df["cluster_p"].tolist() == pytest.approx([1 / 256, 1 / 256])
-    assert df["bh_adj_p"].to_numpy() == pytest.approx(_bh_correct(df["cluster_p"].to_numpy()))
+    # Item-level agreement: no permutation reaches it.
+    assert df["perm_p"].tolist() == pytest.approx([1 / 1000, 1 / 1000])
+    assert df["bh_adj_p"].to_numpy() == pytest.approx(_bh_correct(df["perm_p"].to_numpy()))
+
+
+def _drift_inputs():
+    """Most reference shifts go up, and the model always moves up a little."""
+    rng = np.random.default_rng(6)
+    n_patients, per_patient, classes = 8, 12, ["A", "B"]
+    pids = np.repeat(np.arange(n_patients), per_patient)
+    dp = rng.choice([-0.5, 0.5, 0.5, 0.5], size=(pids.size, 2))
+    dm = np.full(dp.shape, 0.1)
+    dm[::7] = -0.1  # some movement, so the odds-ratio tables are not degenerate
+    return dp, dm, pids, classes
+
+
+def test_h1_per_class_drift_is_chance_not_evidence():
+    from tracks.representation.statistical.hypotheses.h1 import h1_binomial_per_class
+
+    dp, dm, pids, classes = _drift_inputs()
+    df = h1_binomial_per_class(dp, dm, classes, classes, pids, n_resamples=50,
+                               rng=np.random.default_rng(1),
+                               n_permutations=999, null_rng=np.random.default_rng(2))
+    # Agreement is well above 0.5, and the old test against 0.5 calls it significant ...
+    assert (df["sign_agree_rate"] > 0.6).all()
+    assert (df["cluster_p"] < 0.05).all()
+    # ... but the chance rate is just as high, so the confirmatory test does not.
+    assert df["null_rate"].to_numpy() == pytest.approx(df["sign_agree_rate"].to_numpy(), abs=0.05)
+    assert (df["perm_p"] > 0.05).all()
+
+
+def test_h1_cmh_permutation_p_ignores_drift():
+    from tracks.representation.statistical.hypotheses.h1 import h1_cmh_test
+
+    dp, dm, pids, classes = _drift_inputs()
+    res = h1_cmh_test(dp, dm, classes, classes, patient_ids=pids,
+                      n_permutations=999, null_rng=np.random.default_rng(2))
+    assert res["p_cluster"] < 0.05  # reference test against 0.5 is fooled
+    assert res["p_permutation"] > 0.05
+
+    dp, dm, pids, classes = _track1_inputs()
+    res = h1_cmh_test(dp, dm, classes, classes, patient_ids=pids,
+                      n_permutations=999, null_rng=np.random.default_rng(2))
+    assert res["p_permutation"] == pytest.approx(1 / 1000)
 
 
 def test_h1_cmh_reports_cluster_p_only_with_patient_ids():
     from tracks.representation.statistical.hypotheses.h1 import h1_cmh_test
 
     dp, dm, pids, classes = _track1_inputs()
-    assert np.isnan(h1_cmh_test(dp, dm, classes, classes)["p_cluster"])
+    no_ids = h1_cmh_test(dp, dm, classes, classes)
+    assert np.isnan(no_ids["p_cluster"]) and np.isnan(no_ids["p_permutation"])
     res = h1_cmh_test(dp, dm, classes, classes, patient_ids=pids)
     assert res["p_cluster"] == pytest.approx(1 / 256)
 

@@ -1,18 +1,18 @@
 # Hypotheses (`tracks/representation/statistical/hypotheses`)
 
-Canonical location for H1 and H2 hypothesis test implementations.
+Canonical location for Track 1's endpoint tests.
 
-This package implements the two pre-specified confirmatory hypotheses: H1 (Context Sensitivity) and H2 (Contextual Alignment). All functions
+This package implements Track 1's two pre-specified confirmatory endpoints (see `shared/endpoints.py` and `docs/methodology.md`): `directional_alignment` in `h1.py` and `brier_improvement` in `h2.py`. The module and function names keep Track 1's former hypothesis numbers, H1 and H2. Track 1's `directional_alignment` answers the same question as Track 3's (formerly Track 3's H2). All functions
 operate on pre-computed delta and prediction arrays; they do not load data themselves.
 
 ---
 
-## H1 — Context Sensitivity (`h1.py`)
+## Directional alignment, formerly H1 (`h1.py`)
 
 **Research question:** Does the model update its predictions in response to patient context
 in the same direction as the physicians?
 
-H1 is evaluated via three independent inferences. All three are restricted to
+Directional alignment is evaluated via three independent inferences. All three are restricted to
 confirmatory-eligible classes (those with ≥ 15 non-zero physician deltas) and
 to items where the physician delta is non-zero (`Δ_p(i,c) ≠ 0`).
 
@@ -53,7 +53,7 @@ h1_binomial_per_class(
 | `bh_adj_p` | float | BH-adjusted p-value (confirmatory classes only) |
 | `confirmatory` | bool | Whether this class met the eligibility threshold |
 
-**Saved to:** `h1_per_class.csv`
+**Saved to:** `directional_alignment_per_class.csv`
 
 ---
 
@@ -97,7 +97,7 @@ h1_permutation_test(
 | `p_value` | Permutation p-value |
 | `n_permutations` | Number of replicates used |
 
-**Saved to:** `h1_aggregate.json`
+**Saved to:** `directional_alignment_pooled.json`
 
 ---
 
@@ -144,7 +144,7 @@ statsmodels is unavailable, a manual Mantel-Haenszel estimator is used (CI retur
 | `p_cmh` | CMH p-value (1 degree of freedom) |
 | `n_strata` | Number of valid 2×2 tables included |
 
-**Saved to:** `h1_cmh.json`
+**Saved to:** `directional_alignment_cmh.json`
 
 ---
 
@@ -161,12 +161,12 @@ Returns adjusted p-values in the same order as the input.
 
 ---
 
-## H2 — Contextual Alignment (`h2.py`)
+## Brier improvement, formerly H2 (`h2.py`)
 
 **Research question:** Does including patient context move the model's predictions closer
 to the physician interview labels (the ground truth)?
 
-H2 uses the Brier score improvement `BS_cf − BS_ca` as the primary metric: positive values
+It uses the Brier score improvement `BS_cf − BS_ca` as the primary metric: positive values
 mean the context-aware model is closer to the interview labels. A secondary Wasserstein
 distance analysis measures distributional alignment.
 
@@ -209,7 +209,7 @@ h2_wilcoxon_per_class(
 | `wilcoxon_p` | float | Raw one-sided Wilcoxon p-value |
 | `bh_adj_p` | float | BH-adjusted p-value |
 
-**Saved to:** `h2_brier.csv`
+**Saved to:** `brier_improvement_per_class.csv`
 
 ---
 
@@ -247,7 +247,7 @@ no hypothesis test or FDR correction is applied.
 | `ci_lower_cf` / `ci_upper_cf` | 95% bootstrap CI on `W_cf` |
 | `ci_lower_ca` / `ci_upper_ca` | 95% bootstrap CI on `W_ca` |
 
-**Saved to:** `h2_wasserstein.csv`
+**Saved to:** `wasserstein_distance.csv`
 
 ---
 
@@ -281,7 +281,7 @@ patient-level bootstrap CI. The `n_classes_significant` count is derived directl
 | `n_classes_significant` | Count of classes with BH-adjusted p < 0.05 |
 | `n_classes_total` | Total number of classes tested |
 
-**Saved to:** `h2_brier_summary.json`
+**Saved to:** `brier_improvement_summary.json`
 
 ---
 

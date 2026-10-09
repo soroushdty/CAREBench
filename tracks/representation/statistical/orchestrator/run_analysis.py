@@ -20,12 +20,12 @@ logger = logging.getLogger(__name__)
 
 _OUTPUTS = {
     "tau_robustness.csv":      "τ=0.5 vs F1-optimal robustness check",
-    "h1_per_class.csv":        "H1 per-class sign agreement",
-    "h1_aggregate.json":       "H1 aggregate permutation test result",
-    "h1_cmh.json":             "H1 CMH pooled cross-class inference",
-    "h2_brier.csv":            "H2 per-class Brier improvement test",
-    "h2_brier_summary.json":   "H2 macro-average Brier summary",
-    "h2_wasserstein.csv":      "H2 per-class Wasserstein distance",
+    "directional_alignment_per_class.csv": "Directional alignment (formerly H1) per class",
+    "directional_alignment_pooled.json":   "Directional alignment pooled over classes (permutation test)",
+    "directional_alignment_cmh.json":      "Directional alignment across classes (CMH, cluster p-value)",
+    "brier_improvement_per_class.csv":     "Brier improvement (formerly H2) per class",
+    "brier_improvement_summary.json":      "Brier improvement macro-average summary",
+    "wasserstein_distance.csv":            "Per-class Wasserstein distance to the label distribution",
     "icc_results.csv":         "Rater-level ICC(2,1) model-vs-physician",
     "icc_summary.json":        "Rater-level ICC summary statistics",
     "calibration_ece.csv":     "Per-class ECE with >0.10 flag and bootstrap CIs",
@@ -280,7 +280,7 @@ def run_statistical_analysis(
         cfg:                Full pipeline config dict.
         output_dir:         Root directory for all statistical outputs.
         n_resamples:        Bootstrap CI resamples (default 1000).
-        n_permutations:     H1 permutation test replicates (default 10,000).
+        n_permutations:     Permutation / sign-flip replicates (default 10,000).
         strata:             (n_pairs,) 'repeated'/'novel' labels; computed if None.
         arch_predictions:   {arch_name: (n_pairs, n_classes)} for arch comparison; skipped if None.
         ensemble_bundle_path: Path to ensemble_bundle.joblib for ablation.
@@ -381,7 +381,7 @@ def run_statistical_analysis(
         logger.warning("Could not load individual physician labels: %s", exc)
 
     # ------------------------------------------------------------------
-    # Step 4 — H1 per-class binomial test
+    # Step 4 — Directional alignment (H1) per class
     # ------------------------------------------------------------------
     from ..hypotheses.h1 import h1_binomial_per_class, h1_permutation_test, h1_cmh_test
     h1_df = h1_binomial_per_class(
@@ -389,11 +389,14 @@ def run_statistical_analysis(
         patient_ids, n_resamples, rng,
         n_permutations=n_permutations, perm_rng=perm_rng,
     )
-    _save_csv(output_dir / "h1_per_class.csv", h1_df)
-    logger.info("H1 per-class done: %d confirmatory classes.", len(eligible_classes))
+    _save_csv(output_dir / "directional_alignment_per_class.csv", h1_df)
+    logger.info(
+        "Directional alignment per class done: %d confirmatory classes.",
+        len(eligible_classes),
+    )
 
     # ------------------------------------------------------------------
-    # Step 5 — H1 aggregate permutation test
+    # Step 5 — Directional alignment pooled (permutation test)
     # ------------------------------------------------------------------
     h1_agg = h1_permutation_test(
         delta_p, delta_m, patient_ids,
@@ -403,50 +406,50 @@ def run_statistical_analysis(
         rng=rng,
         n_resamples=n_resamples,
     )
-    _save_json(output_dir / "h1_aggregate.json", h1_agg)
+    _save_json(output_dir / "directional_alignment_pooled.json", h1_agg)
     logger.info(
-        "H1 aggregate: rate=%.3f, p=%.4f",
+        "Directional alignment pooled: rate=%.3f, p=%.4f",
         h1_agg["aggregate_rate"], h1_agg["p_value"],
     )
 
     # ------------------------------------------------------------------
-    # Step 6 — H1 CMH pooled cross-class
+    # Step 6 — Directional alignment across classes (CMH)
     # ------------------------------------------------------------------
     h1_cmh = h1_cmh_test(
         delta_p, delta_m, eligible_classes, class_list,
         patient_ids=patient_ids, n_permutations=n_permutations, perm_rng=perm_rng,
     )
-    _save_json(output_dir / "h1_cmh.json", h1_cmh)
+    _save_json(output_dir / "directional_alignment_cmh.json", h1_cmh)
     logger.info(
-        "H1 CMH: OR=%.3f, p=%.4f, cluster p=%.4f",
+        "Directional alignment CMH: OR=%.3f, p=%.4f, cluster p=%.4f",
         h1_cmh["common_odds_ratio"], h1_cmh["p_cmh"], h1_cmh["p_cluster"],
     )
 
     # ------------------------------------------------------------------
-    # Step 7 — H2 Wilcoxon Brier
+    # Step 7 — Brier improvement (H2)
     # ------------------------------------------------------------------
     from ..hypotheses.h2 import h2_wilcoxon_per_class, h2_wasserstein_per_class, h2_macro_summary
     h2_df = h2_wilcoxon_per_class(
         y_hat_cf, y_hat_ca, y_interview, class_list, patient_ids, n_resamples, rng,
         n_permutations=n_permutations, perm_rng=perm_rng,
     )
-    _save_csv(output_dir / "h2_brier.csv", h2_df)
+    _save_csv(output_dir / "brier_improvement_per_class.csv", h2_df)
 
     h2_summ = h2_macro_summary(h2_df, y_hat_cf, y_hat_ca, y_interview, patient_ids, n_resamples, rng)
-    _save_json(output_dir / "h2_brier_summary.json", h2_summ)
+    _save_json(output_dir / "brier_improvement_summary.json", h2_summ)
     logger.info(
-        "H2 macro Brier: CF=%.4f CA=%.4f improve=%.4f, sig_classes=%d/%d",
+        "Brier improvement (macro): CF=%.4f CA=%.4f improve=%.4f, sig_classes=%d/%d",
         h2_summ["macro_BS_cf"], h2_summ["macro_BS_ca"], h2_summ["macro_improvement"],
         h2_summ["n_classes_significant"], h2_summ["n_classes_total"],
     )
 
     # ------------------------------------------------------------------
-    # Step 8 — H2 Wasserstein
+    # Step 8 — Wasserstein distance (descriptive)
     # ------------------------------------------------------------------
     was_df = h2_wasserstein_per_class(
         y_hat_cf, y_hat_ca, y_interview, class_list, patient_ids, n_resamples, rng,
     )
-    _save_csv(output_dir / "h2_wasserstein.csv", was_df)
+    _save_csv(output_dir / "wasserstein_distance.csv", was_df)
 
     # ------------------------------------------------------------------
     # Step 9 — ICC rater-level analysis

@@ -65,7 +65,7 @@ The CLI builds a dataset adapter and a training strategy from config and runs th
         - builds Stage 2 context vectors from the context records
         - train_ensemble_pipeline(): nested LOPO-CV training, calibration,
           Stage 2 fusion
-        - run_statistical_analysis(): H1/H2, ICC, ablation, and calibration
+        - run_statistical_analysis(): directional_alignment, brier_improvement, ICC, ablation, and calibration
           outputs (when statistical_analysis.enabled)
    c. Each writer.write(result, output_dir) → persists artifacts
    d. Framework emits run_manifest.json, adapter_manifest.json,
@@ -89,7 +89,7 @@ Any class implementing `fit_and_evaluate(dataset: RepresentationDataset, config:
    c. ContextBuilder builds correct-context and shuffled-context patient snapshots
    d. LLMClient (or DryRunClient) runs inference for each condition
    e. ScoreParser validates JSON against the canonical privacy-category schema
-   f. HypothesisAnalyzer computes H1–H4 results
+   f. HypothesisAnalyzer computes the four Track 3 endpoints
    g. ReportGenerator produces the markdown report
 4. Runner emits run_manifest.json, adapter_manifest.json, artifact_index.json,
    condition score CSVs, hypothesis summary, and markdown report

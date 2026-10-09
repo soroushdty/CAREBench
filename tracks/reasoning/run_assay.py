@@ -15,7 +15,8 @@ Orchestration order:
    b. Log resumability report
    c. For each (patient_id, item_text) pair × 3 conditions: run LLM (or load from cache)
    d. Parse scores → CSVs
-   e. Run H1–H4 analysis
+   e. Compute the endpoints (context sensitivity, directional alignment,
+      class-level correspondence, context specificity)
    f. Generate report
 """
 
@@ -48,6 +49,7 @@ from tracks.reasoning.config_loader import (
 )
 from tracks.reasoning.context_builder import ContextBuilder
 from tracks.reasoning.dataset_loader import DatasetLoader
+from tracks.reasoning.endpoints import TRACK_ENDPOINTS
 from shared.evaluation.hypothesis_analyzer import HypothesisAnalyzer
 from tracks.reasoning.llm_client import LLMClient
 from tracks.reasoning.prompt_template import PromptTemplate
@@ -517,12 +519,12 @@ def _run_model(
     if not has_cf_cc_valid:
         logging.warning(
             "No valid scores found for context_free or correct_context. "
-            "Skipping hypothesis analysis (H1-H4)."
+            "Skipping endpoint analysis."
         )
         return
 
     # Build valid row mask: require context_free + correct_context valid.
-    # Shuffled is optional for H1-H3.
+    # Shuffled is only needed for context specificity.
     valid_mask_cf_cc = (
         ~np.any(np.isnan(context_free_scores), axis=1)
         & ~np.any(np.isnan(correct_context_scores), axis=1)
@@ -531,7 +533,7 @@ def _run_model(
     if not np.any(valid_mask_cf_cc):
         logging.warning(
             "No rows with valid scores across context_free and correct_context. "
-            "Skipping hypothesis analysis (H1-H4)."
+            "Skipping endpoint analysis."
         )
         return
 
@@ -540,16 +542,16 @@ def _run_model(
     if n_valid < n_total:
         logging.info(
             f"{n_valid}/{n_total} rows have valid context_free + correct_context "
-            "scores. H1-H3 analysis restricted to valid rows."
+            "scores. Endpoint analysis restricted to valid rows."
         )
 
-    # Subset to valid rows for H1-H3
+    # Subset to valid rows
     cf_scores = context_free_scores[valid_mask_cf_cc]
     cc_scores = correct_context_scores[valid_mask_cf_cc]
     delta_phys = paired_dataset.delta_physician[valid_mask_cf_cc]
     valid_patient_ids = patient_ids[valid_mask_cf_cc]
 
-    # --- Step f: Run H1–H4 analysis ---
+    # --- Step f: Compute the endpoints ---
     logging.info("Running hypothesis analysis...")
 
     # Build a minimal paired_dataset-like object with valid_patient_ids
@@ -563,15 +565,17 @@ def _run_model(
     analyzer = HypothesisAnalyzer(subset_dataset, cfg)
 
     h1_result = analyzer.compute_h1(cf_scores, cc_scores)
-    logging.info(f"H1 mean absolute delta: {h1_result['mean_abs_delta']:.4f}")
+    logging.info(f"Context sensitivity (mean |delta|): {h1_result['mean_abs_delta']:.4f}")
 
     h2_result = analyzer.compute_h2(cf_scores, cc_scores, delta_phys)
-    logging.info(f"H2 sign agreement rate: {h2_result['sign_agreement_rate']:.4f}")
+    logging.info(
+        f"Directional alignment (sign agreement rate): {h2_result['sign_agreement_rate']:.4f}"
+    )
 
     h3_result = analyzer.compute_h3(cf_scores, cc_scores, delta_phys)
-    logging.info(f"H3 Pearson r: {h3_result['pearson_r']:.4f}")
+    logging.info(f"Class-level correspondence (Pearson r): {h3_result['pearson_r']:.4f}")
 
-    # H4 requires shuffled-context scores
+    # Context specificity requires shuffled-context scores
     if has_shuffled:
         # Build mask requiring all three conditions valid
         valid_mask_all = valid_mask_cf_cc & ~np.any(np.isnan(shuffled_context_scores), axis=1)
@@ -585,19 +589,22 @@ def _run_model(
             subset_h4 = _SubsetDataset(pids_h4, list(canonical_keys))
             analyzer_h4 = HypothesisAnalyzer(subset_h4, cfg)
             h4_result = analyzer_h4.compute_h4(cf_h4, cc_h4, sc_scores, dp_h4)
-            logging.info(f"H4 mean diff: {h4_result['mean_diff']:.4f}")
+            logging.info(f"Context specificity (mean diff): {h4_result['mean_diff']:.4f}")
         else:
             h4_result = {
                 "status": "skipped",
                 "reason": "No rows with valid scores across all three conditions.",
             }
-            logging.info("H4 skipped: no rows with valid scores across all three conditions.")
+            logging.info(
+                "Context specificity skipped: no rows with valid scores across all "
+                "three conditions."
+            )
     else:
         h4_result = {
             "status": "skipped",
             "reason": "shuffled_context_scores absent or all-NaN",
         }
-        logging.info("H4 skipped: shuffled-context scores not available.")
+        logging.info("Context specificity skipped: shuffled-context scores not available.")
 
     # --- Step g: Generate report ---
     logging.info("Generating report...")
@@ -614,6 +621,7 @@ def _run_model(
         run_timestamp=run_timestamp,
         label_space=label_space,
         category_type=template.category_type,
+        legacy_aliases={te.name: te.legacy_alias for te in TRACK_ENDPOINTS},
         is_dry_run=(cfg.get("backend") == "dry_run"),
         n_context_entities=len(set(patient_ids.tolist())),
         n_task_pairs=len(patient_ids),

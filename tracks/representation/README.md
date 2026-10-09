@@ -6,7 +6,7 @@ This track covers the full representation learning workflow for clinical context
 
 - **`training/`** — Ensemble training pipeline (LOPO-CV, stage1/stage2 models, calibration, threshold tuning)
 - **`models/`** — Model class definitions (`EnsemblePredictor`, `MultiLabelModel`, `ModelRegistry`, `Preprocessor`, `ConstantCalibrator`)
-- **`statistical/`** — Statistical analysis pipeline (hypothesis testing H1/H2, reporting, metrics)
+- **`statistical/`** — Statistical analysis pipeline (`directional_alignment` and `brier_improvement` tests, reporting, metrics)
 
 ## Canonical path
 

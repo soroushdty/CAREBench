@@ -1,4 +1,6 @@
-"""H2 (Contextual Alignment) hypothesis tests.
+"""Brier improvement (Track 1's H2) hypothesis tests.
+
+See shared/endpoints.py.
 
 Two analyses (see the Track 1 endpoints in docs/methodology.md):
   1. Paired per-class test of Brier-score improvement: patient-cluster

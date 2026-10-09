@@ -1,6 +1,6 @@
 # Documentation Index
 
-This directory contains canonical documentation for LM-ContextProbe, a clinical context-shift evaluation framework.
+This directory contains canonical documentation for LM-ContextProbe, an evaluation framework for testing whether language models change their judgments with patient context the way physicians do. The framework is a study design, a set of endpoints with statistical tests, and pipelines that run them on any configured model and dataset. It is not a benchmark: it ships no fixed dataset or leaderboard.
 
 | Document | Description |
 |----------|-------------|

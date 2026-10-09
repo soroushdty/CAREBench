@@ -1,6 +1,6 @@
 # Methodology
 
-This document states what LM-ContextProbe measures, the study design it assumes, how each endpoint is computed and tested, and which design decisions protect the results from known pitfalls. It describes the code as it is in this repository. Where the code falls short of the intended design, the gap is listed under [Known limitations](#known-limitations).
+LM-ContextProbe is an evaluation framework, not a benchmark: it defines a protocol and runs it on whatever model and dataset you supply. This document specifies that protocol. It states what LM-ContextProbe measures, the study design it assumes, how each endpoint is computed and tested, and which design decisions protect the results from known pitfalls. It describes the code as it is in this repository. Where the code falls short of the intended design, the gap is listed under [Known limitations](#known-limitations).
 
 ## The question
 

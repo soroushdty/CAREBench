@@ -1,6 +1,6 @@
 # tracks/
 
-This package contains track-specific evaluation pipelines for the clinical context-shift evaluation framework.
+This package contains track-specific evaluation pipelines for the LM-ContextProbe evaluation framework. Every track runs the same study design and reports the same named endpoints; they differ in how the model gets to use the patient context.
 
 ## Tracks
 

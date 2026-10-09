@@ -2,9 +2,15 @@
 
 > Formerly **CAREBench**. Renamed in October 2026 to avoid confusion with other health-LLM benchmarks of that name ([#19](https://github.com/soroushdty/LM-ContextProbe/issues/19)). Old GitHub links redirect here.
 
-**LM-ContextProbe** is a research framework for studying how language models respond to patient-level clinical context when classifying sensitive EHR data, and whether those responses match the context-dependent judgment shifts that physicians show.
+**LM-ContextProbe** is an evaluation framework for testing whether language models change their judgments with patient context the way physicians do. The built-in task is classifying EHR items into sensitive-data categories; the label set is configurable.
 
-It runs any dataset with human reference labels collected under two conditions: first **without** patient context, then **with** a patient's clinical snapshot. It measures how much a model's judgments move when context is added, and whether they move the same way the human judgments did.
+The framework has three parts:
+
+- **A study design.** Human reference observers label each item twice: first **without** patient context, then **with** the patient's clinical snapshot. Track 3 adds a shuffled (wrong-patient) context as a control.
+- **Endpoints with statistical tests.** How much a model's judgments move when context is added, whether they move the same way the human judgments did, and whether that depends on the context belonging to the right patient. Inference is clustered by patient ([`docs/methodology.md`](docs/methodology.md)).
+- **Pipelines that run the design** on any model you configure and any dataset in the paired-context format, or in another format through an adapter.
+
+It is not a benchmark: there is no fixed dataset or leaderboard. You bring the data and the model, and the results describe that dataset's patients and reference observers.
 
 The framework is a **functional analogy to physician decision-making**. Each evaluation track stands for one way a physician could reach a context-dependent judgment: drawing on general clinical knowledge (representation), learning from supervised case experience (adaptation), or deliberating over the chart at decision time (reasoning). Comparing the tracks against the physician reference tests which mechanism reproduces the physicians' context shifts. It does not claim to model how physicians think.
 
@@ -40,7 +46,7 @@ Dependencies point one way: `tracks/` and `adapters/` import from `shared/`; `sh
 | 2 – Adaptation | Learning from supervised case experience (clinical training, feedback on real cases) | Can the shift be learned from labelled cases and carried over to new patients? | Planned ([#13](https://github.com/soroushdty/LM-ContextProbe/issues/13)) |
 | 3 – Reasoning | Deliberating over the chart at decision time, without changing what the model knows | Does the shift come from reasoning at decision time? | Available |
 
-- **[Track 1 — Representation](tracks/representation/README.md)** (`tracks/representation/`): Bio-ClinicalBERT embedding pipeline, multilabel classifier, context-aware fusion head, LOPO-CV, and statistical analysis of the `directional_alignment` and `brier_improvement` endpoints.
+- **[Track 1 — Representation](tracks/representation/README.md)** (`tracks/representation/`): embedding pipeline (default model Bio_ClinicalBERT), multilabel classifier, context-aware fusion head, LOPO-CV, and statistical analysis of the `directional_alignment` and `brier_improvement` endpoints.
 - **[Track 3 — Reasoning](tracks/reasoning/README.md)** (`tracks/reasoning/`): LLM context-shift assay pipeline. Runs each EHR item under three conditions (context-free, correct-context, shuffled-context) and computes the four Track 3 endpoints against physician judgment shifts.
 
 ### Shared Layer
@@ -51,7 +57,7 @@ The [`shared/`](shared/) directory contains cross-track utilities, preprocessing
 
 ## Research Overview
 
-LM-ContextProbe implements an **LLM context-shift assay**. Human reference observers (for example, physicians working in fixed pairs) label EHR item strings into sensitive-data categories under two conditions. First they see the item without patient information (context-free, `reference_context_free`). Then they see it with a structured clinical snapshot of the patient (correct-context, `reference_correct_context`). These matched counterfactual labels allow a direct measurement of context-induced judgment shifts (`delta_reference`).
+Every track uses the same **paired counterfactual design**. Human reference observers (for example, physicians working in fixed pairs) label EHR item strings into sensitive-data categories under two conditions. First they see the item without patient information (context-free, `reference_context_free`). Then they see it with a structured clinical snapshot of the patient (correct-context, `reference_correct_context`). These matched counterfactual labels allow a direct measurement of context-induced judgment shifts (`delta_reference`).
 
 The central question is: **Does a model change its privacy-category judgment when patient context is added, and do those changes match the human judgment shifts?**
 
@@ -82,7 +88,7 @@ The study data is not distributed with LM-ContextProbe. The bundled example data
 
 ## Project Status
 
-LM-ContextProbe 0.1.0 is an early public release of a research framework, not an established benchmark.
+LM-ContextProbe 0.1.0 is an early public release of an evaluation framework. It has not yet been validated on real data or by simulation.
 
 - **Tested:** both tracks run end to end on the bundled synthetic dataset, under CI.
 - **Not yet available:** results on real data, simulation studies of the endpoints' false-positive rate and power ([#18](https://github.com/soroushdty/LM-ContextProbe/issues/18)), a second dataset format, and a configurable label taxonomy. Known gaps in the current statistics are listed in [`docs/methodology.md`](docs/methodology.md#known-limitations).

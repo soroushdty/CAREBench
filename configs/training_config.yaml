@@ -95,7 +95,8 @@ log_hp_search_grid: true
 # DIMENSIONALITY REDUCTION
 # =============================================================================
 # Fixed PCA components (GPU SVD). Choose at elbow of explained-variance curve.
-# Typical range for 768-dim Bio_ClinicalBERT embeddings: 80–200.
+# Typical range for 768-dim Bio_ClinicalBERT embeddings: 80–200. Clamped to the
+# embedding width, so smaller models still work.
 pca_n_components: 150
 # Whitening corrects BERT-family anisotropy. Set false for contrastive models
 # (Sentence Transformers, BGE, E5, MiniLM).
@@ -165,7 +166,7 @@ stage2_alpha_options:
 # per-class delta logging reports direction mismatches for multiple classes.
 stage2_delta_reg_weight: 1.0
 
-stage2_pca_n_components: null   # 768 → n dims before fusion; matches Stage 1 PCA; set null to disable
+stage2_pca_n_components: null   # embedding width d → n dims before fusion; set null to disable
 stage2_use_cf_passthrough: true  # prepend ŷ_cf to Z so head learns corrections
 
 # Fusion head optimisation settings.

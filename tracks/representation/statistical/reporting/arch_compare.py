@@ -17,16 +17,26 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Approximate parameter counts per class per architecture
-_PARAM_COUNTS: dict[str, str] = {
-    "4_vector":         "4d (30,720/class at d=768)",
-    "2d":               "2d (1,536/class at d=768)",
-    "3d":               "3d (2,304/class at d=768)",
-    "lowrank_bilinear": "2·d·r (12,288/class at d=768, r=8)",
-    "passthrough":      "0 (no learned parameters)",
-    "patient_id":       "d + n_patients",
-    "stage1_only":      "0 (Stage 1 frozen)",
-}
+def _param_counts(d: int | None, r: int = 8) -> dict[str, str]:
+    """Approximate learned weights per class for each architecture.
+
+    ``d`` is the width of the item and context vectors entering Stage 2 (the
+    embedding width, or ``stage2_pca_n_components``). When it is unknown the
+    counts are given symbolically.
+    """
+    def at_d(label: str, n: int, extra: str = "") -> str:
+        return label if d is None else f"{label} ({n:,}/class at d={d}{extra})"
+
+    d_ = d or 0
+    return {
+        "4_vector":         at_d("4d", 4 * d_),
+        "2d":               at_d("2d", 2 * d_),
+        "3d":               at_d("3d", 3 * d_),
+        "lowrank_bilinear": at_d("2·d·r", 2 * d_ * r, f", r={r}"),
+        "passthrough":      "0 (no learned parameters)",
+        "patient_id":       "d + n_patients",
+        "stage1_only":      "0 (Stage 1 frozen)",
+    }
 
 
 def _macro_brier(y_pred: np.ndarray, y_true: np.ndarray) -> float:
@@ -55,6 +65,8 @@ def arch_comparison_table(
     n_resamples: int = 1000,
     rng: np.random.Generator | None = None,
     reference_arch: str = "2d",
+    embedding_dim: int | None = None,
+    lowrank_r: int = 8,
 ) -> pd.DataFrame:
     """Architectural comparison table.
 
@@ -72,6 +84,9 @@ def arch_comparison_table(
         thresholds:       (n_classes,) decision thresholds.
         n_resamples:      Bootstrap resamples.
         reference_arch:   Architecture to compute paired differences against.
+        embedding_dim:    Width d of the vectors entering Stage 2, used for the
+                          parameter counts; None gives symbolic counts.
+        lowrank_r:        Rank r of the low-rank bilinear head.
 
     Returns:
         DataFrame with columns:
@@ -89,6 +104,7 @@ def arch_comparison_table(
 
     from shared.statistical.bootstrap import patient_block_bootstrap
 
+    param_counts = _param_counts(embedding_dim, lowrank_r)
     rows = []
     for arch_name, preds in arch_predictions.items():
         p = np.asarray(preds, dtype=np.float64)
@@ -107,7 +123,7 @@ def arch_comparison_table(
 
         rows.append({
             "architecture": arch_name,
-            "param_count": _PARAM_COUNTS.get(arch_name, "unknown"),
+            "param_count": param_counts.get(arch_name, "unknown"),
             "macro_brier": brier_pt,
             "brier_ci_lower": b_lo,
             "brier_ci_upper": b_hi,

@@ -782,6 +782,33 @@ class TestArchPredictionsReachStats:
             "in arch_predictions."
         )
 
+    def test_arch_comparison_param_counts_follow_embedding_dim(self):
+        """Parameter counts use the actual vector width d, not a fixed 768."""
+        from tracks.representation.statistical.reporting.arch_compare import arch_comparison_table
+
+        n, n_classes = 8, 2
+        rng_np = np.random.default_rng(404)
+        arch_preds = {k: rng_np.random((n, n_classes)).astype(np.float32)
+                      for k in ("4_vector", "2d", "3d", "lowrank_bilinear")}
+        kwargs = dict(
+            arch_predictions=arch_preds,
+            y_interview=(rng_np.random((n, n_classes)) > 0.5).astype(np.float32),
+            class_list=["c0", "c1"],
+            patient_ids=np.repeat([1, 2, 3, 4], 2),
+            thresholds=np.full(n_classes, 0.5),
+            n_resamples=10,
+        )
+
+        df = arch_comparison_table(**kwargs, rng=np.random.default_rng(0), embedding_dim=4096, lowrank_r=4)
+        counts = dict(zip(df["architecture"], df["param_count"]))
+        assert counts["4_vector"] == "4d (16,384/class at d=4096)"
+        assert counts["2d"] == "2d (8,192/class at d=4096)"
+        assert counts["3d"] == "3d (12,288/class at d=4096)"
+        assert counts["lowrank_bilinear"] == "2·d·r (32,768/class at d=4096, r=4)"
+
+        df = arch_comparison_table(**kwargs, rng=np.random.default_rng(0))
+        assert dict(zip(df["architecture"], df["param_count"]))["2d"] == "2d"
+
     def test_arch_comparison_table_has_required_columns(self):
         """Output DataFrame must contain all columns the stats module declares."""
         from tracks.representation.statistical.reporting.arch_compare import arch_comparison_table

@@ -20,6 +20,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from shared.endpoints import PROTOCOL_VERSION
+
 
 def write_run_manifest(
     output_dir: str | Path,
@@ -65,6 +67,7 @@ def write_run_manifest(
         "run_id": run_id,
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "track": track,
+        "protocol_version": PROTOCOL_VERSION,
         "python_version": sys.version,
         "platform": platform.platform(),
         "entry_command": entry_command,

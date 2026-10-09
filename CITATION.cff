@@ -13,9 +13,10 @@ abstract: >-
 authors:
   - family-names: Dianaty
     given-names: Soroush
+    orcid: "https://orcid.org/0000-0001-5674-8999"
+repository-code: "https://github.com/soroushdty/LM-ContextProbe"
 license: Apache-2.0
-version: 0.1.0
-date-released: 2026-10-07
+version: 0.2.0
 keywords:
   - large language models
   - sensitive health information

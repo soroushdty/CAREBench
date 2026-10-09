@@ -57,6 +57,7 @@ if _PROJECT_ROOT not in sys.path:
 
 import yaml
 
+from shared.endpoints import PROTOCOL_VERSION
 from shared.label_space import DEFAULT_LABEL_SPACE, LabelSpace
 from tracks.reasoning.bundle.loader import load_llm_scores, load_physician_consensus
 from tracks.reasoning.prompt_template import DEFAULT_CATEGORY_TYPE
@@ -308,6 +309,7 @@ def main(argv: list[str] | None = None) -> None:
     label_space, class_definitions, category_type = _load_label_space(args.config)
     categories = label_space.keys()
     run_params = {
+        "protocol_version": PROTOCOL_VERSION,
         "seed": args.seed,
         "epsilon": args.epsilon,
         "n_bootstrap": args.n_bootstrap,

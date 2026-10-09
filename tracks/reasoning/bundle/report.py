@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+from shared.endpoints import PROTOCOL_VERSION
 from tracks.reasoning.endpoints import (
     CLASS_CORRESPONDENCE_T3,
     CONTEXT_SENSITIVITY_T3,
@@ -174,7 +175,10 @@ def generate_markdown_report(
 
 
 def _section_title(timestamp: str) -> str:
-    return f"# LLM Context-Shift Analysis Report\n\n**Generated:** {timestamp}"
+    return (
+        f"# LLM Context-Shift Analysis Report\n\n**Generated:** {timestamp}  \n"
+        f"**Protocol version:** {PROTOCOL_VERSION}"
+    )
 
 
 def _section_objective(category_type: str = "privacy") -> str:

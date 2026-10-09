@@ -6,7 +6,7 @@ This document defines the required output artifacts for representation and reaso
 
 | File | Format | Required keys / contents |
 |------|--------|--------------------------|
-| `run_manifest.json` | JSON | `run_id`, `timestamp_utc`, `track`, `python_version`, `config_path`, `output_dir`, `entry_command` |
+| `run_manifest.json` | JSON | `run_id`, `timestamp_utc`, `track`, `protocol_version`, `python_version`, `config_path`, `output_dir`, `entry_command` |
 | `resolved_config.yaml` | YAML | Full resolved config as used (after overlays and defaults) |
 | `adapter_manifest.json` | JSON | `adapter_name`, `adapter_class`, `label_space`, `reference_aggregation_policy` |
 | `artifact_index.json` | JSON | Object mapping canonical artifact roles to actual file paths |

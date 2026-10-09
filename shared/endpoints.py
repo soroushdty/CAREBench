@@ -9,11 +9,21 @@ procedure each track uses are described in ``docs/methodology.md``.
 Earlier versions numbered hypotheses per track (Track 3's H2 was Track 1's
 H1). Tracks keep their old numbers only as display aliases; see
 ``legacy_alias`` in each track's endpoint declaration.
+
+``PROTOCOL_VERSION`` versions the evaluation protocol separately from the
+code: the endpoints, their statistics and their tests. It is written to
+every run manifest and report, so results can cite the protocol they were
+computed under, and a refactor that leaves the numbers unchanged does not
+invalidate them. Bump it whenever an endpoint definition, statistic, test
+or default that changes reported values is changed, and add a row to the
+protocol history in ``docs/methodology.md``.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+PROTOCOL_VERSION = "1"
 
 
 @dataclass(frozen=True)

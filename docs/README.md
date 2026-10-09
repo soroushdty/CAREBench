@@ -10,4 +10,5 @@ This directory contains canonical documentation for LM-ContextProbe, an evaluati
 | [`running_example.md`](running_example.md) | Commands, outputs, and caveats for the synthetic example |
 | [`artifact_contracts.md`](artifact_contracts.md) | Required output artifacts and their schemas |
 | [`data_model.md`](data_model.md) | Canonical vocabulary, machine keys vs display labels |
-| [`methodology.md`](methodology.md) | Endpoints, statistical tests, design rationale, and known limitations |
+| [`methodology.md`](methodology.md) | Endpoints, statistical tests, protocol version, design rationale, and known limitations |
+| [`releasing.md`](releasing.md) | Release checklist: protocol version, Zenodo archiving and DOI |

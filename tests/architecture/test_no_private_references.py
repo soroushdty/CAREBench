@@ -23,9 +23,14 @@ _SKIP_DIRS = {
 
 def _source_files():
     for dirpath, dirnames, filenames in os.walk(_REPO_ROOT):
+        # Virtualenvs are skipped whatever their name (CI creates
+        # ``smoke-venv`` in the checkout; installed packages can contain
+        # section signs).
         dirnames[:] = [
             d for d in dirnames
-            if d not in _SKIP_DIRS and not d.endswith(".egg-info")
+            if d not in _SKIP_DIRS
+            and not d.endswith(".egg-info")
+            and not Path(dirpath, d, "pyvenv.cfg").exists()
         ]
         for name in filenames:
             path = Path(dirpath, name)

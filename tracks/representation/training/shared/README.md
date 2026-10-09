@@ -15,7 +15,6 @@ For the high-level pipeline flow that consumes these utilities, see the parent [
 | `fit_calibrators.py`  | Per-class isotonic regression fitter with degenerate-fold fallback               |
 | `apply_calibrators.py`| Apply fitted per-class calibrators to a probability matrix                       |
 | `resolve_thresholds.py`| Resolve per-class thresholds for final reporting from `cfg["primary_threshold"]` |
-| `lopo_cv.py`          | Leave-One-Patient-Out cross-validation split generator                           |
 | `set_seeds.py`        | Global deterministic-seed setter for `torch`, `numpy`, `random`, hash seed       |
 
 ## `soft_label_utils.py`
@@ -180,16 +179,6 @@ Maps `cfg["primary_threshold"]` to the per-class threshold vector used for final
 | anything else    | Constant 0.5 with a warning                                    |
 
 Returns `(thresholds, meta)` where `meta = {"mode", "value"}` is forwarded into the metric metadata sidecar JSON.
-
-## `lopo_cv.py`
-
-### `lopo_splits(patient_ids) -> list[(train_indices, val_indices)]`
-
-For each unique patient ID, emit one fold where that patient's rows form the validation set and all remaining rows form the training set. Folds are ordered by sorted unique patient IDs.
-
-Raises `ValueError` if `patient_ids` contains fewer than 2 unique patients (a meaningful train/val split is impossible) or is not 1-D.
-
-This is the same generator used for both the outer LOPO loop and every inner LOPO loop (Stage 1 HP search, Stage 2 α search, Stage 2 OOF for post-hoc calibration).
 
 ## `set_seeds.py`
 

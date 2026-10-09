@@ -46,7 +46,7 @@ Dependencies point one way: `tracks/` and `adapters/` import from `shared/`; `sh
 | 2 – Adaptation | Learning from supervised case experience (clinical training, feedback on real cases) | Can the shift be learned from labelled cases and carried over to new patients? | Planned ([#13](https://github.com/soroushdty/LM-ContextProbe/issues/13)) |
 | 3 – Reasoning | Deliberating over the chart at decision time, without changing what the model knows | Does the shift come from reasoning at decision time? | Available |
 
-- **[Track 1 — Representation](tracks/representation/README.md)** (`tracks/representation/`): embedding pipeline (default model Bio_ClinicalBERT), multilabel classifier, context-aware fusion head, LOPO-CV, and statistical analysis of the `directional_alignment` and `brier_improvement` endpoints.
+- **[Track 1 — Representation](tracks/representation/README.md)** (`tracks/representation/`): embedding pipeline (default model Bio_ClinicalBERT), multilabel classifier, context-aware fusion head, patient-grouped cross-validation (leave-one-patient-out or grouped k-fold), and statistical analysis of the `directional_alignment` and `brier_improvement` endpoints.
 - **[Track 3 — Reasoning](tracks/reasoning/README.md)** (`tracks/reasoning/`): LLM prompting pipeline. Runs each EHR item under three conditions (context-free, correct-context, shuffled-context) and computes the four Track 3 endpoints against physician judgment shifts.
 
 ### Shared Layer
@@ -237,7 +237,6 @@ Planned work is tracked in [GitHub issues](https://github.com/soroushdty/LM-Cont
 - **TRIPOD-LLM report**: an auto-filled TRIPOD-LLM checklist per run, with links to the supporting artifacts and explicit TODOs for author-only items.
 - **Multi-agent reference emulation**: blind LLM rater pairs with consensus and adjudication, mirroring the paired-physician reference design (aligned with the EviTrace multi-agent roadmap).
 - **Track 2 — Adaptation** ([#13](https://github.com/soroushdty/LM-ContextProbe/issues/13)): the analogue of a physician learning from supervised case experience. A model is fine-tuned on labelled (patient context, item) cases from training patients, then evaluated on new patients under the same three conditions as Track 3. A learning curve shows how alignment with physicians grows with the number of patients learned from.
-- **Patient-grouped cross-validation** ([#10](https://github.com/soroushdty/LM-ContextProbe/issues/10)): shared, configurable splits (leave-one-patient-out or grouped k-fold) for Tracks 1 and 2.
 - **Shuffled-context condition for Track 1** ([#11](https://github.com/soroushdty/LM-ContextProbe/issues/11)): a wrong-patient context control, so Track 1 can test whether the model uses *this* patient's context, as Track 3's `context_specificity` does.
 - **Same-model comparison across tracks** ([#12](https://github.com/soroushdty/LM-ContextProbe/issues/12)): one model family run frozen, fine-tuned, and prompted, so differences between tracks reflect the mechanism rather than the model.
 - **Distribution-shift evaluation**: requires a second dataset in the paired-context format.

@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from ..shared.lopo_cv import lopo_splits
+from shared.cv import patient_splits, resolve_cv
 
 logger = logging.getLogger(__name__)
 
@@ -241,10 +241,11 @@ def fit_stage2_fusion_fold(
     baseline_metrics: dict = None,
     metrics_df: "pd.DataFrame" = None,
 ) -> "Stage2FusionModel | LowRankBilinearFusionModel":
-    """Fit Stage 2 fusion head with inner LOPO HP selection.
+    """Fit Stage 2 fusion head with inner patient-grouped CV HP selection.
 
     HP grid: stage2_alpha_options only.
-    Selection criterion: mean per-class Brier Score on inner held-out patient.
+    Inner splits: the ``cv.inner`` scheme over ``patient_ids_tr``.
+    Selection criterion: mean per-class Brier Score on inner held-out patients.
     Returns the best model retrained on all n_tr items.
     """
     alpha_options = cfg.get("stage2_alpha_options", [0.01, 0.1, 1.0, 10.0, 100.0])
@@ -293,7 +294,7 @@ def fit_stage2_fusion_fold(
         )
 
     if len(unique_patients) >= 2:
-        inner_splits = lopo_splits(patient_ids_tr)
+        inner_splits = patient_splits(patient_ids_tr, resolve_cv(cfg, "inner"))
         hp_scores = {hp: [] for hp in hp_grid}
         hp_deltas = {hp: [] for hp in hp_grid}  # per-fold per-class mean (preds - y_cf)
         baseline_scores = {"passthrough": [], "item_plus_patient_onehot": []}
@@ -408,10 +409,10 @@ def fit_stage2_fusion_fold(
         best_alpha, best_score, len(Z_tr),
     )
 
-    # Collect LOPO OOF predictions with best_alpha for Stage 2 post-hoc calibration.
+    # Collect inner OOF predictions with best_alpha for Stage 2 post-hoc calibration.
     oof_preds_s2 = np.full_like(y_int_tr, np.nan, dtype=np.float32)
     if len(unique_patients) >= 2:
-        for tr_ix, val_ix in lopo_splits(patient_ids_tr):
+        for tr_ix, val_ix in inner_splits:
             m_oof = _train_one_model(
                 Z_tr[tr_ix], y_int_tr[tr_ix],
                 y_survey_tr[tr_ix], y_cf_tr[tr_ix],
@@ -536,18 +537,17 @@ def fit_all_stage2_architectures_fold(
     cfg: dict,
     r: int = 8,
 ) -> dict:
-    """Fit all alternative Stage 2 fusion architectures under their own inner LOPO.
+    """Fit all alternative Stage 2 fusion architectures under their own inner CV.
 
     Trains '2d', '3d', 'lowrank_bilinear', and 'patient_id' under the full
-    nested patient-level CV protocol (same outer fold, independent inner LOPO
-    alpha search per architecture).  Passthrough/stage1_only require no
+    nested patient-level CV protocol (same outer fold, independent inner
+    ``cv.inner`` alpha search per architecture).  Passthrough/stage1_only require no
     training and are assembled by the caller from Stage 1 predictions.
 
     Returns {arch_name: artifact_dict} where each artifact_dict is compatible
     with apply_stage2_fusion (has at least the "model" key).
     """
     from .stage2_context import build_fusion_matrix as _bfm
-    from ..shared.lopo_cv import lopo_splits as _lopo
 
     lr          = float(cfg.get("stage2_lr", 0.01))
     num_epochs  = int(cfg.get("stage2_num_epochs", 200))
@@ -557,10 +557,13 @@ def fit_all_stage2_architectures_fold(
     device      = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     unique_patients = np.unique(patient_ids_tr)
-    inner_splits    = list(_lopo(patient_ids_tr)) if len(unique_patients) >= 2 else []
+    inner_splits    = (
+        patient_splits(patient_ids_tr, resolve_cv(cfg, "inner"))
+        if len(unique_patients) >= 2 else []
+    )
 
     def _select_and_fit(Z_inner: np.ndarray, model_cls, model_kwargs: dict):
-        """Run inner LOPO alpha search then retrain on full data."""
+        """Run inner-CV alpha search then retrain on full data."""
         best_alpha = float(alpha_opts[0])
         best_score = float("inf")
         for alpha in alpha_opts:

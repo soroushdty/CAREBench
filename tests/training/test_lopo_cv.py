@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tracks.representation.training.shared.lopo_cv import lopo_splits
+from shared.cv import lopo_splits
 from tracks.representation.training.shared.soft_label_utils import macro_brier_score
 from shared.utils.text_utils import normalize_for_matching
 

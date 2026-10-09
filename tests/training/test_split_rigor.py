@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 from unittest.mock import patch
 
-from tracks.representation.training.shared.lopo_cv import lopo_splits
+from shared.cv import lopo_splits
 from tracks.representation.training.stage1.hp_search import _run_hp_candidate
 from tracks.representation.training.shared.soft_label_utils import macro_brier_score
 
@@ -353,7 +353,7 @@ class TestSplitsKeyedOnPatientIdOnly:
             captured_args.append(np.asarray(patient_ids).copy())
             return original_lopo(patient_ids)
 
-        with patch("tracks.representation.training.orchestrator.train_ensemble_pipeline.lopo_splits",
+        with patch("tracks.representation.training.orchestrator.train_ensemble_pipeline.patient_splits",
                    side_effect=capturing_lopo):
             # Call capturing_lopo directly with what the pipeline would pass
             capturing_lopo(pids_train)

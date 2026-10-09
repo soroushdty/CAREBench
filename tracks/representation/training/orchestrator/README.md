@@ -54,12 +54,12 @@ def train_ensemble_pipeline(
 4. **GPU monitor + async postprocessing executor**
    - Start a `GpuMonitor` background thread.
    - Open a single-worker `ThreadPoolExecutor` for fold postprocessing (calibration, threshold tuning, metric DataFrame, checkpoint write) so that I/O happens during the next fold's HP search rather than starving the GPU.
-5. **Per-fold loop** — for each `(train_ix, val_ix)` from `lopo_splits(patient_ids_train)`:
+5. **Per-fold loop** — for each `(train_ix, val_ix)` from `patient_splits(patient_ids_train, cv.outer)` (`shared/cv/`). The inner splits for every fold are built before the loop, so an infeasible `cv.inner` fails before any training:
    - Skip if the fold was loaded from a checkpoint.
    - Apply fold-local fuzzy fallback (matcher built from the fold's training strings only — held-out validation strings never enter the candidate space).
    - Drain the previous fold's pending postprocessing future before the GPU work begins.
-   - **Inner HP search**: parallel over `cfg["n_hp_workers"]` (default 4) threads, each evaluating one HP candidate across all inner LOPO folds; selection criterion is mean inner Brier (lower is better). When `<run_dir>/fold_{i+1}_hp_search.csv` already exists (crash-recovery scenario), the best HP is loaded from CSV and Stage 2 Ridge is skipped for that fold (no inner OOF available).
-   - Derive per-class thresholds and isotonic calibrators from the winning candidate's inner-LOPO OOF — these are leak-free because inner OOF never touches the held-out outer patient.
+   - **Inner HP search**: parallel over `cfg["n_hp_workers"]` (default 4) threads, each evaluating one HP candidate across all inner folds (`cv.inner`); selection criterion is mean inner Brier (lower is better). When `<run_dir>/fold_{i+1}_hp_search.csv` already exists (crash-recovery scenario), the best HP is loaded from CSV and Stage 2 Ridge is skipped for that fold (no inner OOF available).
+   - Derive per-class thresholds and isotonic calibrators from the winning candidate's inner OOF — these are leak-free because inner OOF never touches the outer fold's held-out patients.
    - Compute per-class positive weights (`class_weight_mode`: `"cui"` (default, Cui 2019 Effective Number of Samples) or `"inverse_frequency"`) capped at `weight_cap`.
    - Final retrain on the outer-train fold via `stage1.train_single_model`.
    - Compute Stage 1 context-free predictions (`ŷ_cf`) on test items, calibrated with the inner-OOF calibrators.

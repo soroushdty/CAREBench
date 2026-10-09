@@ -30,13 +30,15 @@ def _run_mini_pipeline(
     n_classes: int = 2,
     with_stage2: bool = False,
     resume_from: Path | None = None,
+    n_test_patients: int = 2,
+    cv: dict | None = None,
 ):
     """Run train_ensemble_pipeline on synthetic data and return (result, paths, cfg)."""
     from tracks.representation.training.orchestrator.train_ensemble_pipeline import train_ensemble_pipeline, _build_paths
 
     rng = np.random.default_rng(0)
     n_train = n_patients * items_per_patient
-    n_test = items_per_patient * 2
+    n_test = items_per_patient * n_test_patients
 
     X_train = rng.standard_normal((n_train, n_features)).astype(np.float32)
     Y_train = (rng.random((n_train, n_classes)) > 0.5).astype(np.float32)
@@ -44,7 +46,7 @@ def _run_mini_pipeline(
 
     X_test = rng.standard_normal((n_test, n_features)).astype(np.float32)
     Y_test = (rng.random((n_test, n_classes)) > 0.5).astype(np.float32)
-    patient_ids_test = np.repeat(np.arange(1, 3), items_per_patient)
+    patient_ids_test = np.repeat(np.arange(1, n_test_patients + 1), items_per_patient)
 
     cfg: dict = {
         "global_seed": 0,
@@ -71,6 +73,8 @@ def _run_mini_pipeline(
         "GPU_MONITOR": {"enabled": False},
         "log_hp_search_grid": False,
     }
+    if cv is not None:
+        cfg["cv"] = cv
 
     context_vectors = None
     Y_test_interview = None
@@ -569,3 +573,109 @@ class TestStatisticsInputAlignment:
                 f"arch_predictions['{arch_name}'] has {preds.shape[0]} rows "
                 f"but patient_ids_test has {len(pids_test)} entries."
             )
+
+
+# ---------------------------------------------------------------------------
+# Grouped k-fold — several patients held out per fold
+# ---------------------------------------------------------------------------
+
+_KFOLD_CV = {
+    "outer": {"scheme": "group_kfold", "n_splits": 2, "seed": 7},
+    "inner": {"scheme": "group_kfold", "n_splits": 2, "seed": 7},
+}
+
+
+def _run_kfold_pipeline(tmp_path, **kwargs):
+    return _run_mini_pipeline(
+        tmp_path, n_patients=6, n_test_patients=6, with_stage2=True, cv=_KFOLD_CV,
+        **kwargs,
+    )
+
+
+class TestGroupKFoldPipeline:
+    """With grouped k-fold, every patient a fold holds out stays out of that fold's models."""
+
+    def test_manifest_records_multi_patient_folds(self, tmp_path):
+        _, paths, _, pids_train, _, n_train, _ = _run_kfold_pipeline(tmp_path)
+        manifest = json.loads(paths.fold_manifest_json.read_text())
+
+        assert manifest["n_folds"] == 2
+        assert manifest["cv"]["outer"] == _KFOLD_CV["outer"]
+        assert manifest["cv"]["inner"] == _KFOLD_CV["inner"]
+        held = [f["held_out_patient_ids"] for f in manifest["folds"]]
+        assert sorted(p for h in held for p in h) == sorted(np.unique(pids_train).tolist())
+        assert all(len(h) == 3 for h in held)
+        assert all(f["held_out_patient_id"] is None for f in manifest["folds"])
+
+        p2f = {int(k): v for k, v in manifest["patient_to_fold"].items()}
+        for fold in manifest["folds"]:
+            for pid in fold["held_out_patient_ids"]:
+                assert p2f[pid] == fold["fold_idx"]
+            assert sorted(fold["val_ix"]) == sorted(
+                np.where(np.isin(pids_train, fold["held_out_patient_ids"]))[0].tolist()
+            )
+
+    def test_fold_pure_cf_uses_the_fold_that_held_the_patient_out(self, tmp_path):
+        result, paths, _, _, pids_test, _, _ = _run_kfold_pipeline(tmp_path)
+        manifest = json.loads(paths.fold_manifest_json.read_text())
+        p2f = {int(k): v for k, v in manifest["patient_to_fold"].items()}
+        cf_fp = result["test_probs_cf_fold_pure"]
+
+        assert not np.isnan(cf_fp).any(), "every test patient was held out by some fold"
+        for row, pid in enumerate(pids_test):
+            fold_idx = p2f[int(pid)]
+            ckpt = joblib.load(paths.checkpoints_dir / f"fold_{fold_idx + 1}.joblib")
+            np.testing.assert_array_almost_equal(cf_fp[row], ckpt["ycf_test_probs"][row], decimal=5)
+
+    def test_stage2_never_trains_on_held_out_patients(self, tmp_path, monkeypatch):
+        import tracks.representation.training.stage2.fit_stage2_fusion as s2
+
+        seen = []
+        original = s2.fit_stage2_fusion_fold
+
+        def capture(*args, **kwargs):
+            seen.append(np.unique(np.asarray(kwargs["patient_ids_tr"])).tolist())
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(s2, "fit_stage2_fusion_fold", capture)
+        _, paths, _, _, _, _, _ = _run_kfold_pipeline(tmp_path)
+        manifest = json.loads(paths.fold_manifest_json.read_text())
+
+        assert len(seen) == manifest["n_folds"]
+        for fold, s2_patients in zip(manifest["folds"], seen):
+            assert s2_patients, "Stage 2 should have training patients"
+            assert not set(s2_patients) & set(fold["held_out_patient_ids"]), (
+                f"Stage 2 for fold {fold['fold_id']} trained on held-out patients "
+                f"{set(s2_patients) & set(fold['held_out_patient_ids'])}"
+            )
+
+    def test_result_records_outer_and_inner_splits(self, tmp_path):
+        result, _, _, pids_train, _, _, _ = _run_kfold_pipeline(tmp_path)
+        cv = result["cv"]
+
+        assert cv["outer"] == _KFOLD_CV["outer"]
+        assert cv["inner"] == _KFOLD_CV["inner"]
+        assert cv["n_outer_folds"] == len(cv["folds"]) == 2
+        all_patients = set(np.unique(pids_train).tolist())
+        for fold in cv["folds"]:
+            inner = fold["inner_held_out_patient_ids"]
+            assert len(inner) == 2
+            assert sorted(p for g in inner for p in g) == sorted(
+                all_patients - set(fold["held_out_patient_ids"])
+            )
+
+    def test_default_cv_is_lopo(self, tmp_path):
+        result, paths, _, pids_train, _, _, _ = _run_mini_pipeline(tmp_path)
+        manifest = json.loads(paths.fold_manifest_json.read_text())
+
+        assert manifest["cv"]["outer"] == {"scheme": "lopo", "n_splits": None, "seed": None}
+        for fold in manifest["folds"]:
+            assert fold["held_out_patient_ids"] == [fold["held_out_patient_id"]]
+        n_patients = len(np.unique(pids_train))
+        assert all(len(f["inner_held_out_patient_ids"]) == n_patients - 1 for f in result["cv"]["folds"])
+
+    def test_infeasible_inner_scheme_fails_before_training(self, tmp_path):
+        cv = {"outer": {"scheme": "lopo"}, "inner": {"scheme": "group_kfold", "n_splits": 1, "seed": 0}}
+        with pytest.raises(ValueError, match="at least 2"):
+            _run_mini_pipeline(tmp_path, cv=cv)
+        assert not list((tmp_path / "model").rglob("fold_*.joblib"))

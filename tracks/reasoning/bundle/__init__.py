@@ -2,7 +2,7 @@
 Analysis bundle generation for the LLM context-shift assay.
 
 Post-hoc pipeline that consumes pre-generated score CSVs and produces a full
-reproducible analysis bundle (paired cell deltas, H1-H4 results, report, zip).
+reproducible analysis bundle (paired cell deltas, endpoint results, report, zip).
 """
 
 from tracks.reasoning.bundle.loader import load_physician_consensus, load_llm_scores

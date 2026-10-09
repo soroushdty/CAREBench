@@ -65,7 +65,7 @@ Under `output/assay/<run_id>/`:
 | `scores/<model>/context_free_scores.csv` | Context-free condition scores |
 | `scores/<model>/correct_context_scores.csv` | Correct-context condition scores |
 | `scores/<model>/shuffled_context_scores.csv` | Shuffled-context condition scores |
-| `reports/<model>/analysis_report.md` | Hypothesis analysis report (H1–H4) |
+| `reports/<model>/analysis_report.md` | Endpoint analysis report (context sensitivity, directional alignment, class-level correspondence, context specificity) |
 
 ## Interpretation Caveats
 

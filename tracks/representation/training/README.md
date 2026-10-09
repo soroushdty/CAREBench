@@ -92,7 +92,7 @@ Fusion strategies (`stage2_context.build_fusion_matrix`):
 Regularization:
 - Ridge α selected by an inner LOPO sweep over `cfg["stage2_alpha_options"]`, scored by mean per-class Brier on the inner held-out patient.
 - Optional **prevalence-shift regularization** (`stage2_delta_reg_weight`): an L2 penalty on the global mean of Stage 2 predictions vs the Stage 1 mean, encouraging patient-specific differential shifts rather than a universally biased global offset.
-- A passthrough sentinel is returned automatically when no learned fusion head beats the Stage 1 passthrough on the inner Brier — H2 is not asserted when the data does not support it.
+- A passthrough sentinel is returned automatically when no learned fusion head beats the Stage 1 passthrough on the inner Brier — `brier_improvement` (formerly H2) is not asserted when the data does not support it.
 
 See [`stage2/README.md`](stage2/README.md) for full details, including the alternative-architecture sweep.
 

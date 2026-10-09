@@ -79,7 +79,7 @@ The `adapter_manifest.json` provides reproducibility metadata about the adapter:
 | `track3.scores.context_free` | `scores/<slug>/context_free_scores.csv` | yes | Columns: `patient_id`, `item_text`, + one per output dimension |
 | `track3.scores.correct_context` | `scores/<slug>/correct_context_scores.csv` | yes | Same schema |
 | `track3.scores.shuffled_context` | `scores/<slug>/shuffled_context_scores.csv` | yes | Same schema |
-| `track3.hypothesis_summary` | `reports/<slug>/analysis_report.md` | yes | H1–H4 results in markdown |
+| `track3.hypothesis_summary` | `reports/<slug>/analysis_report.md` | yes | Endpoint results in markdown, under the names in `shared/endpoints.py` |
 | `track3.run_summary` | `run_manifest.json` | yes | Includes model_id, dry_run flag, n_items |
 
 ## Column Constraints

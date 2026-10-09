@@ -13,6 +13,13 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+from tracks.reasoning.endpoints import (
+    CLASS_CORRESPONDENCE_T3,
+    CONTEXT_SENSITIVITY_T3,
+    CONTEXT_SPECIFICITY_T3,
+    DIRECTIONAL_ALIGNMENT_T3,
+)
+
 _AGGREGATE_LABEL = "aggregate"
 
 
@@ -59,22 +66,23 @@ def _category_adjective(category_type: str) -> str:
 def _interpretation_paragraph(
     model: str, flag: str, row: pd.Series, category_type: str = "privacy"
 ) -> str:
-    h1 = _fmt(row.get("H1_mean_abs_delta_correct"), 4)
-    h1s = _fmt(row.get("H1_mean_abs_delta_shuffled"), 4)
-    h4 = _fmt(row.get("H4_mean_alignment_difference"), 4)
-    h4_ci = _fmt_ci(row.get("H4_ci_low"), row.get("H4_ci_high"))
+    h1 = _fmt(row.get("context_sensitivity_mean_abs_delta_correct"), 4)
+    h1s = _fmt(row.get("context_sensitivity_mean_abs_delta_shuffled"), 4)
+    h4 = _fmt(row.get("context_specificity_mean_alignment_difference"), 4)
+    h4_ci = _fmt_ci(row.get("context_specificity_ci_low"), row.get("context_specificity_ci_high"))
 
     if flag == "no_context_sensitivity":
         return (
             f"**{model}**: The model shows no detectable context sensitivity "
-            f"(H1 mean |Δ| = {h1} ≤ ε). Adding patient context — whether correct "
+            f"(context sensitivity mean |Δ| = {h1} ≤ ε). Adding patient context — whether correct "
             f"or shuffled — does not change the model's {_category_adjective(category_type)} scores. "
-            "No further H2–H4 conclusions can be drawn."
+            "No conclusions about directional alignment, class-level correspondence or "
+            "context specificity can be drawn."
         )
     if flag == "nonspecific_context_inflation":
         return (
             f"**{model}**: The model shows context sensitivity "
-            f"(H1 correct = {h1}, shuffled = {h1s}), but the H4 confidence "
+            f"(context sensitivity correct = {h1}, shuffled = {h1s}), but the context-specificity confidence "
             f"interval for the alignment difference includes zero ({h4_ci}). "
             "This means correct context and shuffled context produce comparable "
             "directional movement. The dominant pattern is **nonspecific context "
@@ -84,7 +92,7 @@ def _interpretation_paragraph(
     if flag == "modest_patient_specific_alignment":
         return (
             f"**{model}**: The model shows context sensitivity and correct context "
-            f"aligns better than shuffled (H4 mean diff = {h4}, 95% CI = {h4_ci}). "
+            f"aligns better than shuffled (context specificity mean diff = {h4}, 95% CI = {h4_ci}). "
             "The CI excludes zero, but the effect is modest (< 0.05). This supports "
             "a **modest patient-specific context-alignment signal**."
         )
@@ -92,7 +100,7 @@ def _interpretation_paragraph(
         return (
             f"**{model}**: The model shows substantial context sensitivity and correct "
             f"context produces meaningfully stronger directional alignment than shuffled "
-            f"context (H4 mean diff = {h4}, 95% CI = {h4_ci}). This supports a "
+            f"context (context specificity mean diff = {h4}, 95% CI = {h4_ci}). This supports a "
             "**strong patient-specific context-alignment signal**."
         )
     return (
@@ -175,14 +183,15 @@ def _section_objective(category_type: str = "privacy") -> str:
         f"This report evaluates whether LLMs change their {_category_adjective(category_type)} judgments when "
         "patient context is added, and whether those changes align with physician "
         "survey-to-interview judgment shifts more than shuffled (mismatched) context does.\n\n"
-        "**Primary endpoint: H4** — the difference in directional alignment between correct "
+        f"**Primary endpoint: {CONTEXT_SPECIFICITY_T3.heading}** — the difference in directional alignment between correct "
         "and shuffled context, restricted to items where physicians shifted their judgment. "
-        "A positive H4 result with a CI excluding zero provides evidence of patient-specific "
+        "A positive context-specificity result with a CI excluding zero provides evidence of patient-specific "
         "context alignment.\n\n"
         "This analysis does **not** test prediction accuracy. Brier score, F1, AUROC, and "
         "final-label accuracy are not reported. The physician survey-to-interview shift is the "
         "human reference delta; correct-context LLM effects must always be interpreted relative "
-        "to shuffled-context effects. Large H1 with weak H4 indicates nonspecific context "
+        "to shuffled-context effects. High context sensitivity with weak context specificity "
+        "indicates nonspecific context "
         "inflation, not patient-specific alignment."
     )
 
@@ -229,7 +238,7 @@ def _section_validation(validation_summary: pd.DataFrame) -> str:
 
 def _section_h1(h1_df: pd.DataFrame, cats: list[str]) -> str:
     lines = [
-        "## H1: LLM Context Sensitivity\n",
+        f"## {CONTEXT_SENSITIVITY_T3.heading}\n",
         "**Question:** Does the LLM change its judgments when patient context is added?\n",
         "Computed for both correct and shuffled contexts. Bootstrap CIs use patient-cluster resampling.\n",
     ]
@@ -248,7 +257,7 @@ def _section_h1(h1_df: pd.DataFrame, cats: list[str]) -> str:
         lines.append(f"- **Proportion changed (shuffled):** {_fmt(r.get('proportion_changed_shuffled'))}\n")
 
         # Per-category table
-        lines.append("| Category | Mean |Δ| Correct | CI Correct | Mean |Δ| Shuffled | CI Shuffled |")
+        lines.append("| Category | Mean \\|Δ\\| Correct | CI Correct | Mean \\|Δ\\| Shuffled | CI Shuffled |")
         lines.append("|---|---|---|---|---|")
         for cat in cats:
             cat_row = grp[grp["category"] == cat]
@@ -268,7 +277,7 @@ def _section_h1(h1_df: pd.DataFrame, cats: list[str]) -> str:
 
 def _section_h2(h2_df: pd.DataFrame, cats: list[str]) -> str:
     lines = [
-        "## H2: Directional Alignment with Physician Shifts\n",
+        f"## {DIRECTIONAL_ALIGNMENT_T3.heading}\n",
         "**Question:** When physicians shift after context, does the LLM move in the same direction?\n",
         "Restricted to cells where Δ_physician ≠ 0. Epsilon threshold applied to near-zero LLM deltas.\n",
     ]
@@ -310,7 +319,7 @@ def _section_h3(
     category_type: str = "privacy",
 ) -> str:
     lines = [
-        "## H3: Class-Level Context-Effect Correspondence\n",
+        f"## {CLASS_CORRESPONDENCE_T3.heading}\n",
         f"**Question:** Are the same {_categories(category_type)} context-sensitive for physicians and the LLM?\n",
         "Pearson and Spearman correlations between class-level mean physician deltas and LLM deltas. "
         "P-values from permutation tests (permute category labels).\n",
@@ -337,7 +346,7 @@ def _section_h3(
         lines.append("### Class-Level Mean Deltas\n")
         for model, grp in h3_effects.groupby("model"):
             lines.append(f"#### Model: `{model}`\n")
-            lines.append("| Category | Mean Δ Physician | Mean |Δ| Physician | "
+            lines.append("| Category | Mean Δ Physician | Mean \\|Δ\\| Physician | "
                          "Mean Δ LLM Correct | Mean Δ LLM Shuffled |")
             lines.append("|---|---|---|---|---|")
             for cat in cats:
@@ -358,7 +367,7 @@ def _section_h3(
 
 def _section_h4(h4_df: pd.DataFrame, cats: list[str]) -> str:
     lines = [
-        "## H4: Correct vs Shuffled Context Control\n",
+        f"## {CONTEXT_SPECIFICITY_T3.heading}\n",
         "**Question:** Is the LLM responding to the correct patient context, "
         "or merely to the presence of extra context text?\n",
         "**Primary endpoint.** Restricted to cells where Δ_physician ≠ 0. "
@@ -400,11 +409,11 @@ def _section_model_comparison(model_comparison: pd.DataFrame) -> str:
         return "## Model Comparison\n\nNo models to compare."
     lines = [
         "## Model Comparison\n",
-        "Models ranked by H4 mean alignment difference (descending). "
-        "H4 is the primary patient-specific context endpoint.\n",
+        "Models ranked by context-specificity mean alignment difference (descending). "
+        "Context specificity is the primary patient-specific context endpoint.\n",
     ]
-    cols = ["rank", "model", "H4_mean_alignment_difference", "H4_ci_low", "H4_ci_high",
-            "H4_p_value", "H1_mean_abs_delta_correct", "H1_mean_abs_delta_shuffled",
+    cols = ["rank", "model", "context_specificity_mean_alignment_difference", "context_specificity_ci_low", "context_specificity_ci_high",
+            "context_specificity_p_value", "context_sensitivity_mean_abs_delta_correct", "context_sensitivity_mean_abs_delta_shuffled",
             "interpretation_flag"]
     avail = [c for c in cols if c in model_comparison.columns]
     header = "| " + " | ".join(avail) + " |"
@@ -453,9 +462,10 @@ def _section_limitations() -> str:
         "4. **Shuffled context control.** The shuffled-context condition uses a single random "
         "draw per patient-item pair. Results may differ with alternative shuffling strategies.\n"
         "5. **LLM temperature.** Results may differ with stochastic sampling (temperature > 0).\n"
-        "6. **H4 interpretation.** Large H1 with weak H4 indicates nonspecific context inflation. "
-        "H4 is the primary endpoint; H1 alone cannot distinguish patient-specific from generic "
-        "context sensitivity."
+        "6. **Context specificity.** High context sensitivity with weak context specificity "
+        "indicates nonspecific context inflation. "
+        "Context specificity is the primary endpoint; context sensitivity alone cannot "
+        "distinguish patient-specific from generic responses to context."
     )
 
 

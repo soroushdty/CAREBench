@@ -37,7 +37,7 @@ Input `Z` must be the concatenation `[e_i ‖ c_p]` with shape `(batch, 2d)`. `U
 
 #### `_PassthroughSentinel`
 
-A trivial stand-in returned by `fit_stage2_fusion_fold` when the Stage 1 passthrough beats every learned fusion candidate on the inner Brier. It exposes `eval()` and `parameters()` so it walks through the same downstream save / restore code paths as a real `nn.Module`. `apply_stage2_fusion` detects it via `isinstance(...)` and short-circuits to `np.clip(y_cf, 0.0, 1.0)`. Its presence is the explicit signal that **H2 is not asserted for that fold** — the data did not support it.
+A trivial stand-in returned by `fit_stage2_fusion_fold` when the Stage 1 passthrough beats every learned fusion candidate on the inner Brier. It exposes `eval()` and `parameters()` so it walks through the same downstream save / restore code paths as a real `nn.Module`. `apply_stage2_fusion` detects it via `isinstance(...)` and short-circuits to `np.clip(y_cf, 0.0, 1.0)`. Its presence is the explicit signal that **`brier_improvement` (formerly H2) is not asserted for that fold** — the data did not support it.
 
 ### Loss + regularization
 
@@ -79,7 +79,7 @@ The main per-outer-fold Stage 2 fitter. Steps:
    - Score two **baselines** on the same inner folds for comparison: `passthrough` (returns ŷ_cf unchanged) and `item_plus_patient_onehot` (concatenates `[Z ‖ one-hot(patient)]`, fixed α=0.01).
 3. **Selection** — pick the α with the lowest mean Brier across inner folds.
 4. **Per-class delta diagnostic** — compare model mean delta to physician mean delta per class. Classes where the model shifts in the **opposite direction** to the physician trigger a warning, indicating the model is learning a spurious global bias rather than a patient-specific correction. The warning suggests increasing `stage2_delta_reg_weight`.
-5. **Passthrough guardrail** — if the passthrough baseline mean Brier `<=` the best fusion mean Brier, return `_PassthroughSentinel(), None`. **H2 is not supported on this fold** — fall back to Stage 1 unchanged.
+5. **Passthrough guardrail** — if the passthrough baseline mean Brier `<=` the best fusion mean Brier, return `_PassthroughSentinel(), None`. **`brier_improvement` (formerly H2) is not supported on this fold** — fall back to Stage 1 unchanged.
 6. **OOF for post-hoc calibration** — re-run inner LOPO at `best_alpha` to collect Stage 2 OOF predictions, then fit isotonic per-class calibrators on the OOF when at least `cfg["calibration_min_samples"]` (default 10) valid rows are available.
 7. **Final retraining** — train one last model on all `n_tr` items at `best_alpha` (no held-out monitoring; ridge handles regularisation).
 

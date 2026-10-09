@@ -1,4 +1,7 @@
-"""H1 (Context Sensitivity) hypothesis tests.
+"""Directional alignment (Track 1's H1) hypothesis tests.
+
+Same endpoint as Track 3's directional alignment (formerly Track 3's H2);
+see shared/endpoints.py.
 
 Three prespecified inferences (see the Track 1 endpoints in docs/methodology.md):
   1. Per-class patient-cluster sign-flip test on sign agreement > 0.5

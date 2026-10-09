@@ -25,22 +25,22 @@ def _make_hypothesis_summary_df(models=("model_a",), flag="strong_patient_specif
                 "n_patient_items": 6,
                 "n_cells": 18,
                 "n_physician_shift_cells": 12,
-                "H1_mean_abs_delta_correct": 0.2,
-                "H1_mean_abs_delta_shuffled": 0.1,
-                "H1_proportion_changed_correct": 0.9,
-                "H1_proportion_changed_shuffled": 0.5,
-                "H2_mean_alignment_correct": 0.15,
-                "H2_mean_alignment_shuffled": 0.05,
-                "H2_sign_agreement_correct": 0.8,
-                "H2_sign_agreement_shuffled": 0.55,
-                "H3_pearson_correct": 0.7,
-                "H3_spearman_correct": 0.65,
-                "H3_pearson_shuffled": 0.1,
-                "H3_spearman_shuffled": 0.05,
-                "H4_mean_alignment_difference": 0.1,
-                "H4_ci_low": 0.02,
-                "H4_ci_high": 0.18,
-                "H4_p_value": 0.03,
+                "context_sensitivity_mean_abs_delta_correct": 0.2,
+                "context_sensitivity_mean_abs_delta_shuffled": 0.1,
+                "context_sensitivity_proportion_changed_correct": 0.9,
+                "context_sensitivity_proportion_changed_shuffled": 0.5,
+                "directional_alignment_mean_alignment_correct": 0.15,
+                "directional_alignment_mean_alignment_shuffled": 0.05,
+                "directional_alignment_sign_agreement_correct": 0.8,
+                "directional_alignment_sign_agreement_shuffled": 0.55,
+                "class_correspondence_pearson_correct": 0.7,
+                "class_correspondence_spearman_correct": 0.65,
+                "class_correspondence_pearson_shuffled": 0.1,
+                "class_correspondence_spearman_shuffled": 0.05,
+                "context_specificity_mean_alignment_difference": 0.1,
+                "context_specificity_ci_low": 0.02,
+                "context_specificity_ci_high": 0.18,
+                "context_specificity_p_value": 0.03,
                 "failure_rate": 0.0,
                 "interpretation_flag": flag,
             }
@@ -49,7 +49,7 @@ def _make_hypothesis_summary_df(models=("model_a",), flag="strong_patient_specif
 
 
 def _make_minimal_dfs():
-    """Create minimal H1–H4 DataFrames for the report."""
+    """Create minimal endpoint DataFrames for the report."""
     cats_and_agg = CATS + ["aggregate"]
 
     def _h1():
@@ -171,10 +171,10 @@ class TestGenerateMarkdownReport:
             "## Data and Pairing",
             "## Models Evaluated",
             "## Validation Summary",
-            "## H1: LLM Context Sensitivity",
-            "## H2: Directional Alignment with Physician Shifts",
-            "## H3: Class-Level Context-Effect Correspondence",
-            "## H4: Correct vs Shuffled Context Control",
+            "## Context sensitivity (formerly H1)",
+            "## Directional alignment (formerly H2)",
+            "## Class-level correspondence (formerly H3)",
+            "## Context specificity (formerly H4)",
             "## Model Comparison",
             "## Interpretation",
             "## Limitations",
@@ -192,8 +192,7 @@ class TestGenerateMarkdownReport:
         out = str(tmp_path / "report.md")
         generate_markdown_report(hs, h1, h2, h3e, h3c, h4, mc, val_df, out, categories=CATS)
         content = open(out).read()
-        assert "H4" in content
-        assert "primary" in content.lower()
+        assert "**Primary endpoint: Context specificity (formerly H4)**" in content
 
     def test_report_does_not_mention_brier_f1_auroc(self, tmp_path):
         hs = _make_hypothesis_summary_df()

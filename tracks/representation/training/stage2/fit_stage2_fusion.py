@@ -37,7 +37,7 @@ class LowRankBilinearFusionModel(nn.Module):
 
     Input Z must be the concatenation [e_i ‖ c_p] with shape (batch, 2d).
     U_c and V_c are learned per class: shape (n_classes, d, r).
-    This gives 2·d·r parameters per class, matching the PDF spec (§3.5).
+    This gives 2·d·r parameters per class.
     forward() returns raw logits.
     """
 
@@ -509,7 +509,7 @@ def _build_patient_id_baseline_features(
     patient_ids: np.ndarray,
     reference_ids: np.ndarray | None = None,
 ) -> np.ndarray:
-    """Build [e_i ‖ one-hot(patient)] features for the patient-ID baseline (§3.5).
+    """Build [e_i ‖ one-hot(patient)] features for the patient-ID baseline.
 
     X_items must be raw item embeddings (not fusion features Z).
     one-hot encodes over reference_ids (the training-patient set for this fold).

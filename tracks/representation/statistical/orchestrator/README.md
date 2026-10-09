@@ -13,16 +13,16 @@ artefact to disk.
 
 ```python
 run_statistical_analysis(
-    # Core arrays (121 paired observations)
-    y_survey: np.ndarray,               # (121, 10) pair-aggregated survey labels {0, 0.5, 1}
-    y_interview: np.ndarray,            # (121, 10) pair-aggregated interview labels {0, 0.5, 1}
-    y_hat_cf: np.ndarray,               # (121, 10) context-free predictions [0, 1]
-    y_hat_ca: np.ndarray,               # (121, 10) context-aware predictions [0, 1]
-    patient_ids: np.ndarray,            # (121,) patient IDs
-    item_texts: np.ndarray,             # (121,) item text strings
-    class_list: list[str],              # 10 class names
+    # Core arrays (one row per paired observation)
+    y_survey: np.ndarray,               # (n_pairs, n_classes) pair-aggregated survey labels {0, 0.5, 1}
+    y_interview: np.ndarray,            # (n_pairs, n_classes) pair-aggregated interview labels {0, 0.5, 1}
+    y_hat_cf: np.ndarray,               # (n_pairs, n_classes) context-free predictions [0, 1]
+    y_hat_ca: np.ndarray,               # (n_pairs, n_classes) context-aware predictions [0, 1]
+    patient_ids: np.ndarray,            # (n_pairs,) patient IDs
+    item_texts: np.ndarray,             # (n_pairs,) item text strings
+    class_list: list[str],              # class names, length n_classes
     # Threshold info
-    avg_thresh_f1opt: np.ndarray,       # (10,) mean inner-fold F1-optimal thresholds
+    avg_thresh_f1opt: np.ndarray,       # (n_classes,) mean inner-fold F1-optimal thresholds
     tau_fixed: float,                   # Fixed threshold (cfg["tau"], typically 0.5)
     # Data source (for individual physician labels)
     dataset_path: Path,                 # Path to dataset.xlsx
@@ -36,12 +36,12 @@ run_statistical_analysis(
     # Optional controls
     n_resamples: int = 1000,
     n_permutations: int = 10_000,
-    strata: np.ndarray | None = None,   # (121,) pre-assigned 'repeated'/'novel'; computed if None
-    arch_predictions: dict | None = None,  # {arch_name: (121,10) preds} for arch comparison
+    strata: np.ndarray | None = None,   # (n_pairs,) pre-assigned 'repeated'/'novel'; computed if None
+    arch_predictions: dict | None = None,  # {arch_name: (n_pairs, n_classes) preds} for arch comparison
     ensemble_bundle_path: Path | None = None,  # For sub-field ablation
     item_texts_train: np.ndarray | None = None, # Training item strings for strata assignment
     rng: np.random.Generator | None = None,
-    X_items_test: np.ndarray | None = None,    # (121, d) item embeddings for ablation
+    X_items_test: np.ndarray | None = None,    # (n_pairs, d) item embeddings for ablation
 ) -> None
 ```
 
@@ -139,8 +139,8 @@ correction applied.
 ### Step 9 — ICC rater-level analysis
 
 Calls `shared.statistical.icc.rater_icc_analysis` using the interview split of `individual_labels`
-from Step 3. Computes 24 model-vs-physician ICC(2,1) values and 12 within-pair
-human-human ICC(2,1) values, each with Lin's CCC as a secondary metric. Failures are
+from Step 3. Computes one model-vs-physician ICC(2,1) per (patient, physician) and one
+within-pair human-human ICC(2,1) per patient, each with Lin's CCC as a secondary metric. Failures are
 caught and logged as warnings (ICC is skipped rather than aborting the pipeline).
 
 **Outputs:** `icc_results.csv`, `icc_summary.json`
@@ -177,7 +177,7 @@ Runs if both `ensemble_bundle_path` and `context_json` are provided. See
 
 ### Step 13 — Architectural comparison
 
-Runs if `arch_predictions` is provided (a dict mapping architecture names to `(121, 10)`
+Runs if `arch_predictions` is provided (a dict mapping architecture names to `(n_pairs, n_classes)`
 prediction arrays). Calls `tracks.representation.statistical.reporting.arch_compare.arch_comparison_table` with paired
 bootstrap differences against the `"2d"` reference architecture.
 

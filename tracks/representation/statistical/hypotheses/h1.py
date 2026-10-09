@@ -1,6 +1,6 @@
 """H1 (Context Sensitivity) hypothesis tests.
 
-Three prespecified inferences per §3.7:
+Three prespecified inferences (see the Track 1 endpoints in docs/methodology.md):
   1. Per-class patient-cluster sign-flip test on sign agreement > 0.5
      (BH FDR q=0.05); the exact binomial p-value is kept as a descriptive,
      unclustered reference
@@ -64,7 +64,7 @@ def h1_binomial_per_class(
     n_permutations: int = 10_000,
     perm_rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
-    """Per-class test of sign agreement rate > 0.5 (§3.7 H1 per-class).
+    """Per-class test of sign agreement rate > 0.5 (H1 per-class).
 
     For each class c, restricted to items with Δ_p(i,c) ≠ 0:
       - Compute sign agreement rate (proportion where sign(Δ_m)==sign(Δ_p))
@@ -171,7 +171,7 @@ def h1_permutation_test(
     rng: np.random.Generator | None = None,
     n_resamples: int = 1000,
 ) -> dict:
-    """Patient-clustered permutation test on aggregate sign agreement (§3.7 H1 aggregate).
+    """Patient-clustered permutation test on aggregate sign agreement (H1 aggregate).
 
     Pooled over (item, class) pairs with non-zero physician delta across all
     confirmatory-eligible classes (or all classes if eligible_classes is None).
@@ -271,7 +271,7 @@ def h1_cmh_test(
     n_permutations: int = 10_000,
     perm_rng: np.random.Generator | None = None,
 ) -> dict:
-    """Class-stratified CMH test for pooled sign-agreement evidence (§3.7 H1 pooled).
+    """Class-stratified CMH test for pooled sign-agreement evidence (H1 pooled).
 
     For each confirmatory-eligible class, builds a valid 2×2 contingency table
     stratified by physician-delta direction:

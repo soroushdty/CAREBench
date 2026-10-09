@@ -209,13 +209,13 @@ GPU_MONITOR:
   save_chart: true
   
 # =============================================================================
-# STATISTICAL ANALYSIS (§3.7 / §5)
+# STATISTICAL ANALYSIS (Track 1 endpoints; see docs/methodology.md)
 # Set enabled: true to run all hypothesis tests and figures after training.
 # =============================================================================
 statistical_analysis:
   enabled: true
   n_resamples: 1000 # Bootstrap CI resamples
   n_permutations: 10000 # H1 patient-clustered permutation test replicates
-  confirmatory_min_nonzero: 15 # Min non-zero Δ_p count for confirmatory eligibility (§3.1.1)
+  confirmatory_min_nonzero: 15 # Min non-zero Δ_p count for confirmatory eligibility
   figure_format: png # png or pdf
   figure_dpi: 150

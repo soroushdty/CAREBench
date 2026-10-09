@@ -970,7 +970,7 @@ def train_ensemble_pipeline(
                 )
         ensemble_artifacts["stage2"].append(_fold_stage2)
 
-        # ── Alternative fusion architectures and baselines (§3.5 / §5.7) ─────────
+        # ── Alternative fusion architectures and baselines ─────────────────────
         # Trains 2d, 3d, lowrank_bilinear, and patient_id under their own inner
         # LOPO alpha search (same outer fold, independently regularised).
         # Passthrough and stage1_only predictions require no training and are
@@ -1431,7 +1431,7 @@ def train_ensemble_pipeline(
         f"{time.perf_counter() - _pipeline_t0:.1f}s."
     )
 
-    # Build arch_predictions dict for statistical comparison (§5.7).
+    # Build arch_predictions dict for statistical comparison.
     # Uses fold-pure predictions: for each row, the model from the fold that
     # excluded that row's patient is used — no fold head averaging.
     arch_predictions: dict | None = None

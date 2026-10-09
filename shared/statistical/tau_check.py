@@ -1,6 +1,6 @@
-"""τ=0.5 vs F1-optimal threshold robustness check (§3.4 / §5.1).
+"""τ=0.5 vs F1-optimal threshold robustness check.
 
-Per §3.4: the τ_c=0.5 robustness check verifies that the fixed threshold
+The τ_c=0.5 robustness check verifies that the fixed threshold
 lies within ~0.05 of the F1-optimal threshold selected during inner-fold
 validation.  Classes where |τ_fixed - τ_f1opt| > 0.05 are flagged and both
 thresholds are reported.
@@ -23,7 +23,7 @@ def tau_robustness_check(
         tau_fixed:         Fixed threshold (cfg['tau'], default 0.5).
         avg_thresh_f1opt:  (n_classes,) mean inner-fold F1-optimal thresholds.
         class_list:        List of class names, length n_classes.
-        tolerance:         Flag threshold; §3.4 uses 0.05.
+        tolerance:         Flag threshold (default 0.05).
 
     Returns:
         DataFrame with columns:
@@ -49,7 +49,7 @@ def tau_robustness_check(
 
 
 def tau_robustness_summary(df: pd.DataFrame) -> str:
-    """One-line summary sentence for §5.1 inline text."""
+    """One-line summary sentence for the robustness check."""
     n_total = len(df)
     n_flagged = int((~df["within_tolerance"]).sum())
     if n_flagged == 0:

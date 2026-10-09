@@ -1,6 +1,6 @@
-"""Stratum repeated vs. novel sub-analysis (§3.3 / §5.6).
+"""Stratum repeated vs. novel sub-analysis.
 
-Each of the 121 paired (item, patient) observations is assigned to one of
+Each paired (item, patient) observation is assigned to one of
 two evaluation strata:
   repeated — item text appeared in Stage 1 training under a different patient
   novel    — item with no Stage 1 training appearance
@@ -28,7 +28,7 @@ def assign_test_strata(
     ensure consistent text normalisation.
 
     Args:
-        item_texts_test:  (n_test,) item strings for the 121 paired eval items.
+        item_texts_test:  (n_test,) item strings for the paired eval items.
         item_texts_train: (n_train,) item strings from the training set (all patients).
 
     Returns:
@@ -60,7 +60,7 @@ def stratum_comparison(
     n_resamples: int = 1000,
     rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
-    """Per-stratum sign agreement rate and Brier improvement with Mann-Whitney U (§5.6).
+    """Per-stratum sign agreement rate and Brier improvement with Mann-Whitney U.
 
     For each stratum (repeated / novel):
       - sign_agree_rate: pooled over confirmatory-eligible classes, Δ_p ≠ 0 items only

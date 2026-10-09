@@ -84,7 +84,7 @@ directory is created automatically if it does not exist.
 ```python
 figure1_delta_histogram(
     delta_p: np.ndarray,     # (n, n_classes) physician delta matrix
-    class_list: list[str],   # 10 class names
+    class_list: list[str],   # class names, length n_classes
     output_path: Path,
     dpi: int = 150,
 ) -> None
@@ -137,9 +137,9 @@ figure3_icc_horizontal_plot(
 
 **What it shows (Figure 3):** A horizontal dot plot with two sets of points:
 
-- **Gray/steelblue points** (bottom, y < 0): The 12 within-pair human-human ICC(2,1)
-  values, sorted ascending. A shaded band shows ± 1 SD around the human-human mean.
-- **Orange points** (top, y > 0): The 24 model-vs-physician ICC(2,1) values, labeled by
+- **Gray/steelblue points** (bottom, y < 0): One within-pair human-human ICC(2,1)
+  per patient, sorted ascending. A shaded band shows ± 1 SD around the human-human mean.
+- **Orange points** (top, y > 0): One model-vs-physician ICC(2,1) per (patient, physician), labeled by
   `P{patient}-Ph{physician}`.
 
 The shaded band provides the human-human benchmark. The vertical dotted line at `ICC = 0`
@@ -185,7 +185,7 @@ Both axes are clamped to `[−1.15, 1.15]` (the theoretical entropy-change range
 
 ```python
 assign_test_strata(
-    item_texts_test: np.ndarray,    # (n_test,) item strings for the 121 eval items
+    item_texts_test: np.ndarray,    # (n_test,) item strings for the paired eval items
     item_texts_train: np.ndarray,   # (n_train,) item strings from the training set
 ) -> np.ndarray                     # (n_test,) str: 'repeated' or 'novel'
 ```

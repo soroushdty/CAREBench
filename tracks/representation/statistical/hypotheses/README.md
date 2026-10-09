@@ -27,6 +27,9 @@ h1_binomial_per_class(
     patient_ids: np.ndarray,      # (n,) for block bootstrap
     n_resamples: int = 1000,
     rng: np.random.Generator | None = None,
+    n_permutations: int = 10_000,
+    perm_rng: np.random.Generator | None = None,  # sign-flip reference test
+    null_rng: np.random.Generator | None = None,  # permutation test
 ) -> pd.DataFrame
 ```
 
@@ -34,11 +37,15 @@ h1_binomial_per_class(
 1. For each class `c`, restrict to rows where `Δ_p[:, c] ≠ 0`.
 2. Compute the sign agreement indicator: `sign(Δ_m(i,c)) == sign(Δ_p(i,c))`.
 3. Count agreements `k` out of `n_nz` non-zero items.
-4. Run `scipy.stats.binomtest(k, n_nz, p=0.5, alternative="greater")` — H₀: chance sign
-   agreement rate = 0.5.
-5. Compute a 95% patient-level bootstrap CI on the agreement rate via `bootstrap_rate()`.
-6. Apply Benjamini-Hochberg FDR correction (q = 0.05) across all confirmatory-eligible
-   classes only. Non-eligible classes receive `bh_adj_p = NaN`.
+4. Within-patient permutation test (confirmatory): shuffle the class's model deltas among
+   each patient's items, keep the physician deltas in place, and recompute the rate.
+   `null_rate` is the null mean (the chance agreement rate, which is not 0.5 when the model
+   and the physicians shift mostly in one direction) and `perm_p` the one-sided p-value.
+5. For reference only: the patient-cluster sign-flip test of agreement > 0.5 (`cluster_p`)
+   and `scipy.stats.binomtest(k, n_nz, p=0.5, alternative="greater")` (`binom_p`).
+6. Compute a 95% patient-level bootstrap CI on the agreement rate via `bootstrap_rate()`.
+7. Apply Benjamini-Hochberg FDR correction (q = 0.05) to `perm_p` across all
+   confirmatory-eligible classes only. Non-eligible classes receive `bh_adj_p = NaN`.
 
 **Returns** a `pd.DataFrame` with columns:
 
@@ -49,8 +56,11 @@ h1_binomial_per_class(
 | `sign_agree_rate` | float | Proportion of non-zero items where signs agree |
 | `ci_lower` | float | 95% bootstrap CI lower bound |
 | `ci_upper` | float | 95% bootstrap CI upper bound |
-| `binom_p` | float | Raw one-sided exact binomial p-value |
-| `bh_adj_p` | float | BH-adjusted p-value (confirmatory classes only) |
+| `null_rate` | float | Chance agreement rate (mean of the within-patient permutation null) |
+| `perm_p` | float | One-sided permutation p-value (confirmatory) |
+| `cluster_p` | float | Sign-flip p-value against 0.5 (reference only) |
+| `binom_p` | float | Raw one-sided exact binomial p-value (reference only) |
+| `bh_adj_p` | float | BH-adjusted `perm_p` (confirmatory classes only) |
 | `confirmatory` | bool | Whether this class met the eligibility threshold |
 
 **Saved to:** `directional_alignment_per_class.csv`

@@ -4,12 +4,19 @@ Same endpoint as Track 3's directional alignment (formerly Track 3's H2);
 see shared/endpoints.py.
 
 Three prespecified inferences (see the Track 1 endpoints in docs/methodology.md):
-  1. Per-class patient-cluster sign-flip test on sign agreement > 0.5
-     (BH FDR q=0.05); the exact binomial p-value is kept as a descriptive,
-     unclustered reference
+  1. Per-class within-patient permutation test of sign agreement against
+     its chance level (BH FDR q=0.05); the sign-flip test against 0.5 and
+     the exact binomial p-value are kept as references
   2. Patient-clustered permutation test on aggregate sign agreement
   3. Cochran-Mantel-Haenszel (CMH) pooled cross-class inference, with a
-     patient-cluster sign-flip p-value on the same cells
+     within-patient permutation p-value for the common odds ratio
+
+The confirmatory tests compare with a within-patient permutation null
+rather than with 0.5: a model whose deltas mostly go the way most reference
+deltas go agrees more than half the time without matching any particular
+item.  The null shuffles the model's deltas among the items of each patient
+and keeps the reference deltas in place, so it keeps how often and in which
+direction the model moves and breaks only the item-level match.
 """
 from __future__ import annotations
 
@@ -20,7 +27,10 @@ import pandas as pd
 from scipy.stats import binomtest
 
 from shared.statistical.bootstrap import bootstrap_rate
-from shared.statistical.cluster_tests import cluster_sign_flip_test
+from shared.statistical.cluster_tests import (
+    cluster_sign_flip_test,
+    within_cluster_permutation_test,
+)
 from shared.statistical.delta import sign_agreement_mask
 
 logger = logging.getLogger(__name__)
@@ -66,26 +76,32 @@ def h1_binomial_per_class(
     rng: np.random.Generator | None = None,
     n_permutations: int = 10_000,
     perm_rng: np.random.Generator | None = None,
+    null_rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
-    """Per-class test of sign agreement rate > 0.5 (H1 per-class).
+    """Per-class test of sign agreement against its chance level (H1 per-class).
 
     For each class c, restricted to items with Δ_p(i,c) ≠ 0:
       - Compute sign agreement rate (proportion where sign(Δ_m)==sign(Δ_p))
-      - Patient-cluster sign-flip test on (agree − 0.5): H₀: rate = 0.5,
-        alternative: greater.  This is the confirmatory p-value (cluster_p).
-      - Exact binomial test with the same hypotheses (binom_p).  It treats
-        cells as independent, so it is reported for reference only.
+      - Within-patient permutation test: the class's model deltas are
+        shuffled among each patient's items, the reference deltas stay in
+        place, and the rate is recomputed.  ``null_rate`` is the null's mean
+        (the chance agreement rate) and ``perm_p`` the one-sided p-value.
+        This is the confirmatory p-value.
+      - Patient-cluster sign-flip test on (agree − 0.5) (``cluster_p``) and
+        the exact binomial test of rate > 0.5 (``binom_p``), for reference
+        only: 0.5 is not the chance level when the model and the reference
+        shift mostly in one direction.
       - 95% patient-level bootstrap CI on the agreement rate
-    BH FDR correction (q=0.05) on cluster_p, across confirmatory-eligible
+    BH FDR correction (q=0.05) on perm_p, across confirmatory-eligible
     classes only.
 
     ``perm_rng`` drives the sign-flip test's Monte Carlo path (unused when the
-    test is exact); it is separate from ``rng`` so that adding the test does
-    not change the bootstrap draws.
+    test is exact) and ``null_rng`` the permutation test; both are separate
+    from ``rng`` so that the tests do not change the bootstrap draws.
 
     Returns a DataFrame with columns:
-      Class, n_nonzero, sign_agree_rate, ci_lower, ci_upper,
-      binom_p, cluster_p, bh_adj_p, confirmatory
+      Class, n_nonzero, sign_agree_rate, ci_lower, ci_upper, null_rate,
+      perm_p, cluster_p, binom_p, bh_adj_p, confirmatory
     """
     dp = np.asarray(delta_p, dtype=np.float32)
     dm = np.asarray(delta_m, dtype=np.float32)
@@ -107,8 +123,10 @@ def h1_binomial_per_class(
                 "sign_agree_rate": float("nan"),
                 "ci_lower": float("nan"),
                 "ci_upper": float("nan"),
-                "binom_p": float("nan"),
+                "null_rate": float("nan"),
+                "perm_p": float("nan"),
                 "cluster_p": float("nan"),
+                "binom_p": float("nan"),
                 "bh_adj_p": float("nan"),
                 "confirmatory": cls in eligible_set,
             })
@@ -127,10 +145,21 @@ def h1_binomial_per_class(
         # Exact binomial test (unclustered; descriptive reference)
         binom_p = float(binomtest(k, n_nz, p=0.5, alternative="greater").pvalue)
 
-        # Patient-cluster sign-flip test (confirmatory)
-        p_val = cluster_sign_flip_test(
+        # Patient-cluster sign-flip test against 0.5 (reference)
+        cluster_p = cluster_sign_flip_test(
             agree_1d.astype(float) - 0.5, pid_nz, n_permutations, perm_rng,
         )
+
+        # Within-patient permutation test against chance (confirmatory)
+        sign_dp = np.sign(dp[:, c_idx])
+
+        def _rate(dm_col: np.ndarray, _sign_dp=sign_dp, _nz=nz_mask) -> float:
+            return float(np.mean((np.sign(dm_col) == _sign_dp)[_nz]))
+
+        null = within_cluster_permutation_test(
+            _rate, dm[:, c_idx], pid, n_permutations, null_rng,
+        )
+        p_val = null["p_value"]
 
         row_idx = len(rows)
         rows.append({
@@ -139,8 +168,10 @@ def h1_binomial_per_class(
             "sign_agree_rate": rate,
             "ci_lower": ci_lo,
             "ci_upper": ci_hi,
+            "null_rate": null["null_mean"],
+            "perm_p": p_val,
+            "cluster_p": cluster_p,
             "binom_p": binom_p,
-            "cluster_p": p_val,
             "bh_adj_p": float("nan"),  # filled below
             "confirmatory": cls in eligible_set,
         })
@@ -273,6 +304,7 @@ def h1_cmh_test(
     patient_ids: np.ndarray | None = None,
     n_permutations: int = 10_000,
     perm_rng: np.random.Generator | None = None,
+    null_rng: np.random.Generator | None = None,
 ) -> dict:
     """Class-stratified CMH test for pooled sign-agreement evidence (H1 pooled).
 
@@ -288,22 +320,26 @@ def h1_cmh_test(
         Cell (1,1): Δ_p<0, Δ_m≤0  → physician-model both non-positive (agree)
 
         Columns are CONSISTENT across rows (both represent model direction),
-        so the common odds ratio is interpretable:
-            OR = (a·d)/(b·c) = r²/(1−r)²  where r = sign-agreement rate
-            OR > 1  ⟺  sign agreement > 50%
+        so the common odds ratio is interpretable: OR > 1 means the model
+        moves up more often when the reference moved up than when it moved
+        down.  Unlike the raw agreement rate, OR = 1 for a model that moves
+        up at the same rate whatever the reference did.
 
     Strata where either physician direction is absent (all Δ_p in one direction)
     are skipped to avoid degenerate tables with a zero row margin.
 
     Combines tables via statsmodels StratifiedTable (common-odds-ratio test).
     The CMH test counts cells as independent.  When ``patient_ids`` is given,
-    ``p_cluster`` is a patient-cluster sign-flip test of pooled sign
-    agreement > 0.5 over the cells of the included strata; it is the
-    confirmatory counterpart of ``p_cmh``.
+    ``p_permutation`` is the confirmatory, patient-aware counterpart of
+    ``p_cmh``: a one-sided within-patient permutation test of the
+    Mantel-Haenszel common odds ratio > 1, in which each patient's model
+    delta rows (all included classes together) are shuffled among that
+    patient's items.  ``p_cluster`` (patient-cluster sign-flip test of pooled
+    sign agreement > 0.5 on the same cells) is kept for reference only.
 
     Returns dict with keys:
-        common_odds_ratio, ci_lower, ci_upper, chi2_cmh, p_cmh, p_cluster,
-        n_strata
+        common_odds_ratio, ci_lower, ci_upper, chi2_cmh, p_cmh,
+        p_permutation, p_cluster, n_strata
     Falls back to a manual Mantel-Haenszel calculation if statsmodels is
     unavailable.
     """
@@ -312,6 +348,7 @@ def h1_cmh_test(
     eligible_set = set(eligible_classes)
 
     tables: list[np.ndarray] = []
+    included: list[int] = []
     pooled_agree: list[np.ndarray] = []
     pooled_pids: list[np.ndarray] = []
     pid = np.asarray(patient_ids) if patient_ids is not None else None
@@ -342,6 +379,7 @@ def h1_cmh_test(
             continue
 
         tables.append(np.array([[a, b], [c, d]], dtype=float))
+        included.append(c_idx)
         if pid is not None:
             nz = pos | neg
             agree = (pos & (dm_col > 0.0)) | (neg & (dm_col <= 0.0))
@@ -355,11 +393,12 @@ def h1_cmh_test(
             "ci_upper": float("nan"),
             "chi2_cmh": float("nan"),
             "p_cmh": float("nan"),
+            "p_permutation": float("nan"),
             "p_cluster": float("nan"),
             "n_strata": 0,
         }
 
-    p_cluster = float("nan")
+    p_cluster = p_permutation = float("nan")
     if pid is not None:
         p_cluster = cluster_sign_flip_test(
             np.concatenate(pooled_agree) - 0.5,
@@ -367,6 +406,21 @@ def h1_cmh_test(
             n_permutations,
             perm_rng,
         )
+        dp_inc = dp[:, included]
+        pos_inc, neg_inc = dp_inc > 0.0, dp_inc < 0.0
+
+        def _mh_odds_ratio(dm_inc: np.ndarray) -> float:
+            up = dm_inc > 0.0
+            n = (pos_inc | neg_inc).sum(axis=0)
+            num = ((pos_inc & up).sum(axis=0) * (neg_inc & ~up).sum(axis=0) / n).sum()
+            den = ((pos_inc & ~up).sum(axis=0) * (neg_inc & up).sum(axis=0) / n).sum()
+            if den == 0.0:
+                return float("inf") if num > 0.0 else float("nan")
+            return float(num / den)
+
+        p_permutation = within_cluster_permutation_test(
+            _mh_odds_ratio, dm[:, included], pid, n_permutations, null_rng,
+        )["p_value"]
 
     try:
         from statsmodels.stats.contingency_tables import StratifiedTable
@@ -380,12 +434,13 @@ def h1_cmh_test(
             "ci_upper": float(ci[1]),
             "chi2_cmh": float(summary.statistic),
             "p_cmh": float(summary.pvalue),
+            "p_permutation": p_permutation,
             "p_cluster": p_cluster,
             "n_strata": len(tables),
         }
     except Exception as exc:
         logger.warning("statsmodels StratifiedTable failed (%s); using manual MH.", exc)
-        return {**_manual_mh(tables), "p_cluster": p_cluster}
+        return {**_manual_mh(tables), "p_permutation": p_permutation, "p_cluster": p_cluster}
 
 
 def _manual_mh(tables: list[np.ndarray]) -> dict:

@@ -96,10 +96,11 @@ Calls `shared.statistical.icc.load_individual_physician_labels()`. Used in Steps
 
 ### Step 4 — Directional alignment per class (formerly H1)
 
-Calls `tracks.representation.statistical.hypotheses.h1.h1_binomial_per_class`. The confirmatory p-value (`cluster_p`) is a
-patient-cluster sign-flip test of sign agreement > 0.5; the exact binomial p-value (`binom_p`) treats cells as independent
-and is kept for reference only. BH FDR correction is applied to `cluster_p` across confirmatory-eligible classes; all
-classes are reported with their `confirmatory` flag.
+Calls `tracks.representation.statistical.hypotheses.h1.h1_binomial_per_class`. The confirmatory p-value (`perm_p`) is a
+within-patient permutation test of sign agreement against its chance level (`null_rate`): the class's model deltas are
+shuffled among each patient's items. The sign-flip test of agreement > 0.5 (`cluster_p`) and the exact binomial p-value
+(`binom_p`) are kept for reference only. BH FDR correction is applied to `perm_p` across confirmatory-eligible classes;
+all classes are reported with their `confirmatory` flag.
 
 **Output:** `directional_alignment_per_class.csv`
 
@@ -115,8 +116,9 @@ each patient block, pooled across confirmatory-eligible classes.
 
 Calls `tracks.representation.statistical.hypotheses.h1.h1_cmh_test`. Builds one 2×2 table per confirmatory-eligible class
 (stratified by physician-delta direction) and combines them via the Mantel-Haenszel
-common-odds-ratio statistic. `p_cluster` is a patient-cluster sign-flip test of pooled sign agreement > 0.5 on the same
-cells; `p_cmh` treats cells as independent and is kept for reference only.
+common-odds-ratio statistic. `p_permutation` is a within-patient permutation test of the common odds ratio > 1 (each
+patient's model delta rows are shuffled among that patient's items). `p_cmh` treats cells as independent and `p_cluster`
+tests pooled sign agreement > 0.5; both are kept for reference only.
 
 **Output:** `directional_alignment_cmh.json`
 

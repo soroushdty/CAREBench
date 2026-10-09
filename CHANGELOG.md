@@ -4,6 +4,10 @@
 
 The first archived release (Zenodo DOI). Endpoints and tests are **protocol v1**.
 
+- **Configurable patient-grouped cross-validation** (#10). Track 1's outer and inner loops were always leave-one-patient-out, which needs N outer × (N−1) inner fits for N patients. Each loop can now use grouped k-fold instead: `cv: {outer: {scheme, n_splits, seed}, inner: {...}}` in `configs/training_config.yaml`, with `scheme` either `lopo` (default) or `group_kfold`. The split code moved from `tracks/representation/training/shared/lopo_cv.py` to `shared/cv/` so Track 2 can use it.
+  - Every split holds out whole patients. Code that assumed one held-out patient per fold now handles several: Stage 2 excludes all of the fold's held-out patients from its training rows, and fold-pure scoring scores each test row with the fold that held out that row's patient.
+  - `run_manifest.json` gains a `cv` object with the schemes and each outer fold's held-out patients and inner-fold patients. `model/fold_manifest.json` gains `cv` and per-fold `held_out_patient_ids`; `held_out_patient_id` is `null` for folds that hold out several patients.
+  - With the default `lopo`, Track 1's predictions, metrics, and statistical outputs on `examples/synthetic` are byte-identical to before.
 - **Protocol version.** `PROTOCOL_VERSION` in `shared/endpoints.py` versions the endpoints and tests separately from the code. It is written to every `run_manifest.json` (and Track 1's reproducibility manifest) as `protocol_version`, to the post-hoc bundle's run parameters, and to the header of the Track 3 run report and the bundle report. It is bumped whenever a change would alter reported values; the history is in `docs/methodology.md#protocol-version`. This release is protocol v1.
 - **Python 3.11 or newer.** `requires-python` said 3.10, but the pinned `scipy==1.17.1` needs 3.11, so installing on 3.10 failed. CI now tests 3.11 and 3.12.
 - **Citation metadata.** `CITATION.cff` has the author's ORCID and the repository URL, and no longer gives a release date: Zenodo takes it from the GitHub release.

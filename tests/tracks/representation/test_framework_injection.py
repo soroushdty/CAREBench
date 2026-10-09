@@ -203,6 +203,35 @@ class TestFrameworkInjection:
 
         assert result == {"status": "ok", "metrics": {"macro_f1": 0.85}}
 
+    def test_run_manifest_records_strategy_cv_splits(self, tmp_path: Path):
+        """A strategy's ``cv`` record is copied into run_manifest.json."""
+        import json
+
+        cv = {
+            "outer": {"scheme": "group_kfold", "n_splits": 2, "seed": 0},
+            "inner": {"scheme": "lopo", "n_splits": None, "seed": None},
+            "n_outer_folds": 2,
+            "folds": [{"fold_idx": 0, "held_out_patient_ids": [1, 3]}],
+        }
+
+        class CVStrategy(FakeStrategy):
+            def fit_and_evaluate(self, dataset, config):
+                return {**super().fit_and_evaluate(dataset, config), "cv": cv}
+
+        track = RepresentationTrack(adapter=FakeAdapter(), strategy=CVStrategy())
+        track.run({"output_dir": str(tmp_path)})
+
+        manifest = json.loads((tmp_path / "run_manifest.json").read_text())
+        assert manifest["cv"] == cv
+
+    def test_run_manifest_without_strategy_cv(self, tmp_path: Path):
+        import json
+
+        track = RepresentationTrack(adapter=FakeAdapter(), strategy=FakeStrategy())
+        track.run({"output_dir": str(tmp_path)})
+
+        assert "cv" not in json.loads((tmp_path / "run_manifest.json").read_text())
+
     def test_output_dir_created(self, tmp_path: Path):
         """Framework creates output_dir if it doesn't exist."""
         adapter = FakeAdapter()

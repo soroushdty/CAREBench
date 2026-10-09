@@ -1,4 +1,4 @@
-from .shared.lopo_cv import lopo_splits  # noqa: F401
+from shared.cv import lopo_splits  # noqa: F401
 
 __all__ = ["lopo_splits"]
 

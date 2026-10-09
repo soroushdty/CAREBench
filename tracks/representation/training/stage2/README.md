@@ -10,7 +10,7 @@ For the high-level pipeline architecture and how Stage 2 connects to Stage 1 and
 
 | File                    | Purpose                                                                              |
 | ----------------------- | ------------------------------------------------------------------------------------ |
-| `fit_stage2_fusion.py`  | Stage 2 fusion heads, inner-α LOPO HP search, prevalence-shift regularization, alternative architectures, post-hoc Stage 2 calibration |
+| `fit_stage2_fusion.py`  | Stage 2 fusion heads, inner-α HP search (`cv.inner`), prevalence-shift regularization, alternative architectures, post-hoc Stage 2 calibration |
 | `stage2_context.py`     | Patient context encoding and fusion-feature assembly                                 |
 
 ## `fit_stage2_fusion.py`
@@ -73,14 +73,14 @@ Mean per-class Brier Score with NaN-target masking. Returns `1.0` (worst possibl
 The main per-outer-fold Stage 2 fitter. Steps:
 
 1. Resolve the model class from `cfg["fusion_strategy"]`: `"lowrank_bilinear"` → `LowRankBilinearFusionModel(r=cfg["lowrank_bilinear_r"])`, otherwise `Stage2FusionModel`.
-2. **Inner LOPO α search** over `cfg["stage2_alpha_options"]` (default `[0.01, 0.1, 1.0, 10.0, 100.0]`):
+2. **Inner α search** (`cv.inner` splits) over `cfg["stage2_alpha_options"]` (default `[0.01, 0.1, 1.0, 10.0, 100.0]`):
    - For every inner split and every α, train a fresh model with `_train_one_model(..., Z_val, y_val)` and score it on the held-out inner patient via `_brier_score(preds, y_int_val)`.
    - Track per-α `hp_deltas` (mean prediction shift vs ŷ_cf) for diagnostic logging.
    - Score two **baselines** on the same inner folds for comparison: `passthrough` (returns ŷ_cf unchanged) and `item_plus_patient_onehot` (concatenates `[Z ‖ one-hot(patient)]`, fixed α=0.01).
 3. **Selection** — pick the α with the lowest mean Brier across inner folds.
 4. **Per-class delta diagnostic** — compare model mean delta to physician mean delta per class. Classes where the model shifts in the **opposite direction** to the physician trigger a warning, indicating the model is learning a spurious global bias rather than a patient-specific correction. The warning suggests increasing `stage2_delta_reg_weight`.
 5. **Passthrough guardrail** — if the passthrough baseline mean Brier `<=` the best fusion mean Brier, return `_PassthroughSentinel(), None`. **`brier_improvement` (formerly H2) is not supported on this fold** — fall back to Stage 1 unchanged.
-6. **OOF for post-hoc calibration** — re-run inner LOPO at `best_alpha` to collect Stage 2 OOF predictions, then fit isotonic per-class calibrators on the OOF when at least `cfg["calibration_min_samples"]` (default 10) valid rows are available.
+6. **OOF for post-hoc calibration** — re-run the inner splits at `best_alpha` to collect Stage 2 OOF predictions, then fit isotonic per-class calibrators on the OOF when at least `cfg["calibration_min_samples"]` (default 10) valid rows are available.
 7. **Final retraining** — train one last model on all `n_tr` items at `best_alpha` (no held-out monitoring; ridge handles regularisation).
 
 Returns `(final_model, s2_calibrators)`. The orchestrator wraps these in a fold dict that also captures the optional Stage 2 PCA, the fusion strategy, the bilinear rank `r`, the `use_cf_passthrough` flag, and the class list.
@@ -107,7 +107,7 @@ Builds `[e_i ‖ one-hot(patient)]` features for the patient-ID baseline. `X_ite
 
 #### `fit_all_stage2_architectures_fold(X_items_tr, patient_ids_tr, context_vectors, y_int_tr, y_survey_tr, y_cf_tr, class_list, cfg, r=8) -> dict`
 
-Trains the four alternative fusion architectures under their own independent inner LOPO α searches:
+Trains the four alternative fusion architectures under their own independent inner α searches (`cv.inner`):
 
 | Architecture        | Z construction                                         | Model                               |
 | ------------------- | ------------------------------------------------------ | ----------------------------------- |
@@ -123,7 +123,7 @@ Returns `{arch_name: {"model": fitted_model}}`. The orchestrator forwards each f
 | Key                                  | Default                       | Effect                                                       |
 | ------------------------------------ | ----------------------------- | ------------------------------------------------------------ |
 | `fusion_strategy`                    | `"2d"` (in-code fallback and shipped [`config/training_config.yaml`](../../../config/training_config.yaml) value) | Choice of fusion vector / model class for the main head      |
-| `stage2_alpha_options`               | `[0.01, 0.1, 1.0, 10.0, 100.0]` | Ridge α grid for inner LOPO search                          |
+| `stage2_alpha_options`               | `[0.01, 0.1, 1.0, 10.0, 100.0]` | Ridge α grid for the inner search                           |
 | `stage2_lr`                          | `0.01`                        | Adam learning rate                                           |
 | `stage2_num_epochs`                  | `200`                         | Max epochs                                                   |
 | `stage2_early_stopping_patience`     | `20`                          | Validation patience (only when `Z_val/y_val` provided)       |

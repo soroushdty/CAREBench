@@ -22,7 +22,7 @@ from ..shared.set_seeds import set_seeds
 from ..stage1.train_single_model import train_single_model
 from .compute_metrics_and_save import compute_metrics_df, write_metrics_csv
 from .plot_ensemble_figures import compute_ensemble_curves, write_ensemble_figures
-from ..shared.lopo_cv import lopo_splits
+from shared.cv import held_out_patients, patient_splits, patient_to_fold, resolve_cv
 from ..shared.soft_label_utils import (
     _soft_scores,
     _soft_average_precision,
@@ -109,6 +109,37 @@ def _write_metric_metadata(meta_path: str, **kwargs) -> None:
     """Write a JSON sidecar file describing a metrics CSV."""
     with open(meta_path, "w", encoding="utf-8") as _f:
         _json_mod.dump(kwargs, _f, indent=2)
+
+
+def _cv_record(
+    outer_cv, inner_cv, outer_splits, outer_held_out, patient_ids_train, inner_splits_by_fold,
+) -> dict:
+    """Describe the outer and inner splits by held-out patient IDs, for the run manifest.
+
+    The Stage 1 inner splits are listed per outer fold. Stage 2's inner loops
+    use the same inner scheme over the patients in Stage 2's training rows.
+    """
+    folds = []
+    for fold_idx, ((train_ix, val_ix), inner_splits) in enumerate(
+        zip(outer_splits, inner_splits_by_fold)
+    ):
+        patient_ids_tr = patient_ids_train[train_ix]
+        folds.append({
+            "fold_idx": fold_idx,
+            "held_out_patient_ids": outer_held_out[fold_idx],
+            "n_train": int(len(train_ix)),
+            "n_val": int(len(val_ix)),
+            "inner_held_out_patient_ids": [
+                [int(float(p)) for p in patients]
+                for patients in held_out_patients(patient_ids_tr, inner_splits)
+            ],
+        })
+    return {
+        "outer": outer_cv.to_dict(),
+        "inner": inner_cv.to_dict(),
+        "n_outer_folds": len(outer_splits),
+        "folds": folds,
+    }
 
 
 def _log_metric_summary(
@@ -285,11 +316,11 @@ def train_ensemble_pipeline(
     patient_ids_test: np.ndarray | None = None,
     context_vectors: dict | None = None,
 ):
-    """LOPO-CV ensemble training pipeline.
+    """Patient-grouped CV ensemble training pipeline.
 
     Args:
         X_train, Y_train:         Training embeddings and labels.
-        patient_ids_train:        Per-row patient IDs for outer LOPO splits.
+        patient_ids_train:        Per-row patient IDs for the outer splits (``cv.outer``).
         X_test, Y_test:           Held-out test embeddings and labels.
         cfg:                      Pipeline configuration dict.
         item_strings_train:       Optional array of item strings parallel to
@@ -357,7 +388,30 @@ def train_ensemble_pipeline(
     paths = _build_paths(cfg)
 
     # outer_splits must be known before resume detection so n_folds is available.
-    outer_splits = lopo_splits(patient_ids_train)
+    outer_cv = resolve_cv(cfg, "outer")
+    inner_cv = resolve_cv(cfg, "inner")
+    outer_splits = patient_splits(patient_ids_train, outer_cv)
+    # Patients held out by each outer fold, and the fold that held out each
+    # patient. Fold-pure scoring uses these to score every test row with the
+    # fold whose model never saw that row's patient.
+    _outer_held_out = [
+        [int(float(p)) for p in _patients]
+        for _patients in held_out_patients(patient_ids_train, outer_splits)
+    ]
+    _patient_to_fold = {
+        int(float(_pid)): _fi
+        for _pid, _fi in patient_to_fold(patient_ids_train, outer_splits).items()
+    }
+    # Inner splits depend only on each outer fold's training patients; build
+    # them now so an infeasible inner scheme fails before any training.
+    _inner_splits_by_fold = [
+        patient_splits(patient_ids_train[_tr_ix], inner_cv)
+        for _tr_ix, _ in outer_splits
+    ]
+    logging.info(
+        "Cross-validation: outer %s (%d folds), inner %s.",
+        outer_cv.to_dict(), len(outer_splits), inner_cv.to_dict(),
+    )
 
     _setup_output_dirs(paths, resume=resume_from_checkpoint)
     ensemble_root = str(paths.ensemble_root)  # kept for legacy string uses below
@@ -384,7 +438,7 @@ def train_ensemble_pipeline(
 
     ensemble_artifacts = {
         'models': [], 'preps': [], 'calibs': [], 'thresh': [],
-        'thresh_inner': [],          # per-fold thresholds from winning HP's inner-LOPO OOF (leak-free)
+        'thresh_inner': [],          # per-fold thresholds from winning HP's inner-CV OOF (leak-free)
         'pos_weights': [],
         'stage2': [],                # per-fold Ridge meta-models (or None entries)
     }
@@ -505,7 +559,7 @@ def train_ensemble_pipeline(
             int(np.sum(unresolved_mask_test)) if unresolved_mask_test is not None else 0,
         )
 
-    logging.info(f"Starting LOPO-CV Training on X_train: {X_train.shape}...")
+    logging.info(f"Starting patient-grouped CV training on X_train: {X_train.shape}...")
     _pipeline_t0 = time.perf_counter()
 
     if X_train.shape[0] < 2:
@@ -527,14 +581,6 @@ def train_ensemble_pipeline(
     # next fold's HP search runs on GPU. Avoids concurrent list mutations.
     _post_executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=1)
     _pending_post: "Future | None" = None
-
-    # Pre-compute patient→outer-fold mapping so Stage 2 passthrough can substitute
-    # fold-pure cross-fitted ŷ_cf (from a Stage 1 model NOT trained on that patient)
-    # for inner LOPO validation patients, avoiding optimism from non-cross-fitted ŷ_cf.
-    _patient_to_fold_pre = {
-        int(float(patient_ids_train[outer_splits[i][1][0]])): i
-        for i in range(len(outer_splits))
-    }
 
     for fold_idx, (train_ix, val_ix) in enumerate(outer_splits):
         fold_id = str(fold_idx + 1)
@@ -604,10 +650,14 @@ def train_ensemble_pipeline(
 
         # Logging: outer fold start
         _fold_t0 = time.perf_counter()
-        _held_out_patient = int(patient_ids_train[val_ix[0]])
+        _held_out_label = (
+            f"held-out patient: {_outer_held_out[fold_idx][0]}"
+            if len(_outer_held_out[fold_idx]) == 1
+            else f"held-out patients: {_outer_held_out[fold_idx]}"
+        )
         logging.info(
             f"Outer fold {fold_idx + 1} / {len(outer_splits)} — "
-            f"held-out patient: {_held_out_patient} "
+            f"{_held_out_label} "
             f"({len(val_ix)} val rows, {len(train_ix)} train rows) — "
             f"starting HP search."
         )
@@ -650,11 +700,11 @@ def train_ensemble_pipeline(
             )
             _pending_post = None
 
-        # Inner LOPO for hyperparameter selection
-        inner_splits = lopo_splits(patient_ids_tr)
+        # Inner patient-grouped CV for hyperparameter selection
+        inner_splits = _inner_splits_by_fold[fold_idx]
         best_score = np.inf
         best_hp = None
-        # best_inner_oof: Stage 1 OOF from the winning HP candidate's inner LOPO.
+        # best_inner_oof: Stage 1 OOF from the winning HP candidate's inner CV.
         # Used for thresh_inner derivation and Stage 2 Ridge fitting. None when
         # HP is loaded from a crash-recovery CSV (no OOF available); Ridge is
         # skipped and thresh_inner falls back to 0.5 for that fold.
@@ -693,7 +743,7 @@ def train_ensemble_pipeline(
 
         if best_hp is None:
             # --- Parallel inner HP grid search ---
-            # Each HP candidate runs all inner LOPO folds in a separate thread.
+            # Each HP candidate runs all inner folds in a separate thread.
             # Threads share the CUDA context safely; unique per-thread seeds
             # prevent global RNG collisions between concurrent workers.
             n_hp_workers = max(1, int(cfg.get("n_hp_workers", 4)))
@@ -742,7 +792,7 @@ def train_ensemble_pipeline(
                 _hp_df.to_csv(paths.fold_hp_search_csv(fold_idx), index=False)
         assert best_hp is not None, f"HP search failed for fold {fold_idx + 1}"
 
-        # Derive per-fold thresholds and fit calibrators from the winning HP candidate's inner-LOPO OOF.
+        # Derive per-fold thresholds and fit calibrators from the winning HP candidate's inner-CV OOF.
         # best_inner_oof covers all outer-training rows and never touches the held-out patient.
         if best_inner_oof is not None:
             fold_thresh_inner = threshold_tuning(best_inner_oof, Y_tr, class_list, cfg)
@@ -851,13 +901,11 @@ def train_ensemble_pipeline(
             from ..stage2.stage2_context import build_fusion_matrix
             from ..stage2.fit_stage2_fusion import fit_stage2_fusion_fold
 
-            # Identify held-out patient for this outer fold.
-            _held_out = int(float(patient_ids_train[val_ix[0]]))
-
-            # Stage 2 training items: test items from patients ≠ held-out
-            # that have at least one non-NaN interview label.
-            _s2_mask = (
-                np.array([int(float(p)) for p in patient_ids_test]) != _held_out
+            # Stage 2 training items: test items from patients this outer fold
+            # did not hold out that have at least one non-NaN interview label.
+            _s2_mask = ~np.isin(
+                np.array([int(float(p)) for p in patient_ids_test]),
+                _outer_held_out[fold_idx],
             )
             if Y_test_interview is None:
                 raise ValueError("Y_test_interview must not be None for Stage 2 training")
@@ -895,14 +943,14 @@ def train_ensemble_pipeline(
                 # Default: outer fold's transductive CF (may be biased for inner val).
                 _y_cf_s2 = _y_cf_test_fold[_s2_idx]
                 if _use_cf_pt:
-                    # Inner Stage 2 LOPO val patient Q's ŷ_cf should come from a Stage 1
+                    # Inner Stage 2 validation patient Q's ŷ_cf should come from a Stage 1
                     # model NOT trained on Q. Substitute fold-pure CF from Q's own outer
                     # fold where that fold has already been computed; otherwise fall back.
                     _y_cf_s2 = _y_cf_test_fold[_s2_idx].copy()
                     _n_xfit = 0
                     for _qi, _global_i in enumerate(_s2_idx):
                         _qpid = int(float(patient_ids_test[_global_i]))
-                        _qfold = _patient_to_fold_pre.get(_qpid)
+                        _qfold = _patient_to_fold.get(_qpid)
                         if _qfold is not None and _qfold in _test_probs_cf_folds:
                             _y_cf_s2[_qi] = _test_probs_cf_folds[_qfold][_global_i]
                             _n_xfit += 1
@@ -972,7 +1020,7 @@ def train_ensemble_pipeline(
 
         # ── Alternative fusion architectures and baselines ─────────────────────
         # Trains 2d, 3d, lowrank_bilinear, and patient_id under their own inner
-        # LOPO alpha search (same outer fold, independently regularised).
+        # inner-CV alpha search (same outer fold, independently regularised).
         # Passthrough and stage1_only predictions require no training and are
         # assembled from _y_cf_test_fold at the end of the fold loop.
         if _use_fusion_stage2 and _fold_stage2 is not None and '_s2_idx' in locals() and len(_s2_idx) > 0:
@@ -1112,11 +1160,16 @@ def train_ensemble_pipeline(
             "class_list": class_list,
             "n_train": int(X_train.shape[0]),
             "n_test": int(X_test.shape[0]),
+            "cv": {"outer": outer_cv.to_dict(), "inner": inner_cv.to_dict()},
             "folds": [
                 {
                     "fold_id": _fi + 1,
                     "fold_idx": _fi,
-                    "held_out_patient_id": int(float(patient_ids_train[outer_splits[_fi][1][0]])),
+                    # The single held-out patient; None when the fold holds out several.
+                    "held_out_patient_id": (
+                        _outer_held_out[_fi][0] if len(_outer_held_out[_fi]) == 1 else None
+                    ),
+                    "held_out_patient_ids": _outer_held_out[_fi],
                     "val_ix": outer_splits[_fi][1].tolist(),
                     "n_val": int(len(outer_splits[_fi][1])),
                     "n_train_fold": int(len(outer_splits[_fi][0])),
@@ -1127,10 +1180,7 @@ def train_ensemble_pipeline(
                 for _fi in range(len(outer_splits))
             ],
             "test_patient_ids": [int(float(p)) for p in patient_ids_test],
-            "patient_to_fold": {
-                int(float(patient_ids_train[outer_splits[_fi][1][0]])): _fi
-                for _fi in range(len(outer_splits))
-            },
+            "patient_to_fold": _patient_to_fold,
         }
         with open(paths.fold_manifest_json, "w", encoding="utf-8") as _mf:
             _json_mod.dump(_fold_manifest, _mf, indent=2)
@@ -1176,7 +1226,7 @@ def train_ensemble_pipeline(
                 "class_list": class_list,
             },
         )
-    # avg_thresh: mean of per-fold thresholds derived from each fold's inner-LOPO OOF.
+    # avg_thresh: mean of per-fold thresholds derived from each fold's inner-CV OOF.
     # Used as a secondary robustness check only — not the primary reported threshold.
     # ensemble_artifacts['thresh'] (outer fold calibrated thresholds) is retained only
     # for per-fold diagnostic reporting in CV_folds.csv.
@@ -1190,11 +1240,11 @@ def train_ensemble_pipeline(
         logger.info(f"Class '{cname}': threshold={_tau_thresh[i]:.4f}")
 
     # ── Stage 1 OOF metrics (train_stage1_oof_vs_survey_metrics.csv) ─────────
-    # OOF predictions are LOPO held-out estimates against survey labels (Y_train).
+    # OOF predictions are patient-held-out estimates against survey labels (Y_train).
     # This is the primary Stage 1 evaluation — a clean, unbiased estimate.
     logger.warning(
         "[METRIC][LABEL SOURCE] Stage 1 OOF metrics use SURVEY labels (Y_train) as ground truth. "
-        "These are LOPO out-of-fold predictions — a clean held-out estimate within the survey label space."
+        "These are patient-grouped out-of-fold predictions — a clean held-out estimate within the survey label space."
     )
     _n_uninit = int(np.sum(np.all(oof_preds_final == -1.0, axis=1)))
     if _n_uninit > 0:
@@ -1203,11 +1253,12 @@ def train_ensemble_pipeline(
             "Check for missing or crashed folds.", _n_uninit,
         )
     _s1_oof_path = paths.ensemble_root / "train_stage1_oof_vs_survey_metrics.csv"
+    _oof_source = f"oof_{outer_cv.scheme}"
     train_metrics_df = compute_metrics_df(oof_preds_final, Y_train, _tau_thresh, class_list, cfg, patient_ids_train)
     write_metrics_csv(train_metrics_df, _s1_oof_path)
     _write_metric_metadata(
         str(_s1_oof_path) + ".meta.json",
-        stage="stage1", prediction_source="oof_lopo",
+        stage="stage1", prediction_source=_oof_source,
         target_label_source="survey",
         is_clean_heldout_estimate=True, is_diagnostic=False,
         thresholding_mode=str(threshold_meta),
@@ -1215,7 +1266,7 @@ def train_ensemble_pipeline(
         n_patients=int(len(np.unique(patient_ids_train))),
         n_folds=int(len(outer_splits)),
     )
-    _log_metric_summary(logger, _s1_oof_path.name, "oof_lopo", "survey",
+    _log_metric_summary(logger, _s1_oof_path.name, _oof_source, "survey",
                         str(threshold_meta), train_metrics_df, is_primary=True)
 
     write_ensemble_figures(compute_ensemble_curves(oof_preds_final, Y_train, class_list, cfg), str(paths.dir_figures_train))
@@ -1225,7 +1276,7 @@ def train_ensemble_pipeline(
     test_probs = ens_model.predict_proba(X_test, patient_ids=patient_ids_test)
 
     # ── Stage 1 test metrics (test_stage1_vs_survey_metrics.csv) ─────────────
-    # Averaged context-free predictions across all LOPO folds vs survey labels.
+    # Averaged context-free predictions across all outer folds vs survey labels.
     # NOTE: transductive — each test item is predicted by ALL folds then averaged.
     # This is a DIAGNOSTIC file, not a clean held-out estimate.
     # Build ordered list here so it can be used in the log message and averaging below.
@@ -1272,7 +1323,7 @@ def train_ensemble_pipeline(
     # Write metadata sidecar for the incremental CV_folds.csv produced during the fold loop.
     _write_metric_metadata(
         str(paths.cv_folds_csv) + ".meta.json",
-        stage="stage1", prediction_source="oof_lopo_per_fold",
+        stage="stage1", prediction_source=f"{_oof_source}_per_fold",
         target_label_source="survey",
         is_clean_heldout_estimate=True, is_diagnostic=False,
         thresholding_mode=str(threshold_meta),
@@ -1293,10 +1344,6 @@ def train_ensemble_pipeline(
     _cf_fp_shape_ref = Y_test_survey if Y_test_survey is not None else Y_test
     _cf_fold_pure = np.full_like(_cf_fp_shape_ref, np.nan)
     _cf_fold_pure_fold_ids = np.full(_cf_fp_shape_ref.shape[0], -1, dtype=int)
-    _patient_to_fold = {
-        int(float(patient_ids_train[outer_splits[i][1][0]])): i
-        for i in range(len(outer_splits))
-    }
     _failed_cf_fold_pure = 0
     for _pi, _pid in enumerate(patient_ids_test):
         _fi = _patient_to_fold.get(int(float(_pid)), None)
@@ -1322,10 +1369,6 @@ def train_ensemble_pipeline(
         _s2_fold_pure = np.full_like(Y_test_survey, np.nan)
         _s2_fold_pure_fold_ids = np.full(Y_test_survey.shape[0], -1, dtype=int)
         _failed_fold_pure = 0
-        _patient_to_fold = {
-            int(float(patient_ids_train[outer_splits[i][1][0]])): i
-            for i in range(len(outer_splits))
-        }
         for _pi, _pid in enumerate(patient_ids_test):
             _fi = _patient_to_fold.get(int(float(_pid)), None)
             if _fi is not None:
@@ -1485,6 +1528,10 @@ def train_ensemble_pipeline(
         "test_probs_ca_transductive": _s2_transductive, # Diagnostic transductive Stage 2 predictions
         "avg_thresh_f1opt": avg_thresh,                # (n_classes,) mean inner-fold F1-optimal thresholds
         "arch_predictions": arch_predictions,          # {arch_name: (n_test, n_classes)} or None
+        "cv": _cv_record(
+            outer_cv, inner_cv, outer_splits, _outer_held_out,
+            patient_ids_train, _inner_splits_by_fold,
+        ),
     }
     if oof_strata is not None:
         result["oof_strata"] = oof_strata

@@ -72,6 +72,8 @@ The `adapter_manifest.json` provides reproducibility metadata about the adapter:
 | `track1.bundle` | `model/ensemble_bundle.joblib` | if produced | Serialized model ensemble |
 | `track1.checkpoints` | `model/checkpoints/` | if produced | Per-fold training checkpoints |
 
+Track 1's `run_manifest.json` also has a `cv` object recording the cross-validation splits: the `outer` and `inner` schemes (`scheme`, `n_splits`, `seed`), `n_outer_folds`, and per outer fold its `held_out_patient_ids`, `n_train`, `n_val`, and `inner_held_out_patient_ids` (the patients each Stage 1 inner fold holds out). `model/fold_manifest.json` lists each fold's `held_out_patient_ids` and `val_ix`, and maps every patient to the fold that held it out (`patient_to_fold`); `held_out_patient_id` is that fold's single patient under leave-one-patient-out and `null` when a fold holds out several.
+
 ## Track 3 Artifact Contract
 
 | Canonical role | Expected path | Required | Contents |

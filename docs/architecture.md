@@ -63,13 +63,14 @@ The CLI builds a dataset adapter and a training strategy from config and runs th
    b. strategy.fit_and_evaluate(dataset, config) → result dict
       ExistingEnsembleTrainingStrategy:
         - builds Stage 2 context vectors from the context records
-        - train_ensemble_pipeline(): nested LOPO-CV training, calibration,
-          Stage 2 fusion
+        - train_ensemble_pipeline(): nested patient-grouped CV training
+          (shared.cv; LOPO by default), calibration, Stage 2 fusion
         - run_statistical_analysis(): directional_alignment, brier_improvement, ICC, ablation, and calibration
           outputs (when statistical_analysis.enabled)
    c. Each writer.write(result, output_dir) → persists artifacts
-   d. Framework emits run_manifest.json, adapter_manifest.json,
-      artifact_index.json, and resolved_config.yaml in the run folder
+   d. Framework emits run_manifest.json (with the strategy's `cv` splits),
+      adapter_manifest.json, artifact_index.json, and resolved_config.yaml
+      in the run folder
 ```
 
 Custom adapters and strategies can be injected into `RepresentationTrack` directly, or registered in `_ADAPTERS` / `_STRATEGIES` in `tracks/representation/runner.py` to make them selectable from config.

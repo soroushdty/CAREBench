@@ -11,7 +11,7 @@ For the high-level pipeline architecture and how Stage 1 connects to Stage 2 and
 | File                    | Purpose                                                                              |
 | ----------------------- | ------------------------------------------------------------------------------------ |
 | `train_single_model.py` | Train one `MultiLabelModel` (MLP / Logistic Regression head) with early stopping     |
-| `hp_search.py`          | Inner-LOPO hyperparameter candidate evaluator — designed for parallel ThreadPoolExecutor execution |
+| `hp_search.py`          | Inner-CV hyperparameter candidate evaluator — designed for parallel ThreadPoolExecutor execution |
 | `compute_bce_loss.py`   | Numerically stable weighted Binary Cross Entropy with Logits                         |
 
 ## `train_single_model.py`
@@ -94,13 +94,13 @@ The threshold vector used for the monitor is determined by `cfg["primary_thresho
 
 ### `_run_hp_candidate(hp_t, X_tr, Y_tr, inner_splits, cfg, seed_base) -> (hp, mean_score, inner_oof_preds)`
 
-Evaluates one HP candidate across all inner LOPO folds. Designed to run on a `ThreadPoolExecutor` worker (the orchestrator submits up to `cfg["n_hp_workers"]` candidates concurrently).
+Evaluates one HP candidate across all inner folds. Designed to run on a `ThreadPoolExecutor` worker (the orchestrator submits up to `cfg["n_hp_workers"]` candidates concurrently).
 
 Inputs:
 
 - **`hp_t`** — 1-tuple of `(head_config,)` where `head_config` is the `hidden_dims` list to evaluate.
 - **`X_tr, Y_tr`** — Outer-fold training data (numpy `float32`).
-- **`inner_splits`** — `[(train_ix, val_ix), ...]` from `shared.lopo_cv.lopo_splits(patient_ids_tr)`.
+- **`inner_splits`** — `[(train_ix, val_ix), ...]` from `shared.cv.patient_splits(patient_ids_tr, cv.inner)`.
 - **`cfg`** — Full pipeline config dict.
 - **`seed_base`** — Unique integer per HP candidate (the orchestrator passes `(hp_idx + 1) * 1000`); added to `cfg["global_seed"]`. Distinct candidates therefore use disjoint seed ranges, and within a candidate each inner split offsets by `split_idx * 10` so fold seeds are also disjoint.
 

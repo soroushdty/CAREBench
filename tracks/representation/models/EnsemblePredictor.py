@@ -40,7 +40,7 @@ class EnsemblePredictor:
         # Empty dict means logistic regression.
         self.model_arch = model_arch or {}
         # stage2: list of per-fold PyTorch fusion head models (Stage2FusionModel or
-        # LowRankBilinearFusionModel), one per outer LOPO fold (or None when that
+        # LowRankBilinearFusionModel), one per outer fold (or None when that
         # fold's Stage 2 training was skipped or failed).  Each fold's model is
         # applied to fusion features before averaging, so the held-out patient for
         # fold F never influenced fold F's Stage 2 head.  None entries are skipped.

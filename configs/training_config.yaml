@@ -53,6 +53,24 @@ activation: gelu
 # =============================================================================
 global_seed: 42
 num_epochs: 50
+
+# =============================================================================
+# CROSS-VALIDATION
+# -----------------------------------------------------------------------------
+# Every split holds out whole patients. Set the outer loop (held-out
+# predictions) and the inner loop (HP / alpha search, calibration OOF)
+# separately.
+#   scheme: lopo         → leave one patient out (default; n_splits and seed
+#                          must be null)
+#           group_kfold  → patients shuffled with seed and dealt into n_splits
+#                          folds; n_splits >= number of patients gives one
+#                          patient per fold
+#   n_splits: number of folds for group_kfold
+#   seed: shuffle seed for group_kfold (null → global_seed)
+# =============================================================================
+cv:
+  outer: {scheme: lopo, n_splits: null, seed: null}
+  inner: {scheme: lopo, n_splits: null, seed: null}
 early_stopping_patience: 5
 # Metric used for early stopping and model selection each epoch.
 objective: F1

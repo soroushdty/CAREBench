@@ -113,6 +113,8 @@ class RepresentationTrack:
             entry_command="python main.py --track representation",
             config_path=config.get("_config_path"),
             strategy=strategy_name,
+            # The strategy's cross-validation splits, when it reports them.
+            extra={"cv": result["cv"]} if result.get("cv") else None,
         )
 
         # Adapter manifest — use adapter.manifest() if available, else minimal

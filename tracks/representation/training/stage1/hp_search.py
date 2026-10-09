@@ -20,7 +20,7 @@ def _run_hp_candidate(
     cfg,
     seed_base: int,
 ):
-    """Evaluate one HP candidate across all inner LOPO folds.
+    """Evaluate one HP candidate across all inner folds.
 
     Designed to run in a ThreadPoolExecutor thread. Uses a unique seed derived
     from seed_base to avoid global RNG collisions with sibling threads.
@@ -28,7 +28,7 @@ def _run_hp_candidate(
     Args:
         hp_t:        1-tuple of (head_config,) where head_config is a hidden_dims list.
         X_tr, Y_tr:  Outer-fold training data (numpy float32).
-        inner_splits: List of (train_ix, val_ix) index arrays from lopo_splits.
+        inner_splits: List of (train_ix, val_ix) index arrays from shared.cv.patient_splits.
         cfg:         Pipeline config dict.
         seed_base:   Unique integer per HP candidate; added to global_seed.
 

@@ -1,7 +1,15 @@
 cff-version: 1.2.0
-message: "If you use CAREBench, please cite it as below, together with the study whose design it builds on."
-title: "CAREBench: a benchmark framework for context-aware classification of sensitive health data"
+message: "If you use LM-ContextProbe, please cite it as below, together with the study whose design it builds on."
+title: "LM-ContextProbe: testing whether language models shift their sensitive-data judgments with patient context the way physicians do"
 type: software
+abstract: >-
+  LM-ContextProbe is an evaluation framework for testing whether language
+  models change their judgments with patient context the way physicians do.
+  It defines a paired counterfactual study design (each item labelled by
+  reference observers without and then with patient context), named endpoints
+  with patient-clustered statistical tests, and pipelines that run the design
+  on any configured model and dataset. It is not a benchmark and ships no
+  study data; a synthetic example dataset is included.
 authors:
   - family-names: Dianaty
     given-names: Soroush
@@ -13,7 +21,7 @@ keywords:
   - sensitive health information
   - data segmentation
   - clinical context
-  - benchmark
+  - evaluation framework
 references:
   - type: article
     title: "New Automated Granular Data Segmentation Approach: Context Impacts Categorization by Physicians"

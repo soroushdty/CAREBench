@@ -1,8 +1,8 @@
-# CAREBench Training Orchestrator
+# LM-ContextProbe Training Orchestrator
 
 **Canonical path:** `tracks/representation/training/orchestrator`
 
-This directory acts as the control center for the CAREBench representation model training pipeline. It manages the end-to-end nested Leave-One-Patient-Out cross-validation (LOPO-CV) process, seamlessly integrating hyperparameter search, model training, calibration, threshold tuning, metric computation, figure generation, GPU monitoring, and crash-recovery checkpointing.
+This directory acts as the control center for the LM-ContextProbe representation model training pipeline. It manages the end-to-end nested Leave-One-Patient-Out cross-validation (LOPO-CV) process, seamlessly integrating hyperparameter search, model training, calibration, threshold tuning, metric computation, figure generation, GPU monitoring, and crash-recovery checkpointing.
 
 For the high-level pipeline architecture and how this submodule connects to Stage 1, Stage 2, and the shared utilities, see the parent [training README](../README.md).
 

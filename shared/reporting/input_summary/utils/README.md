@@ -1,4 +1,4 @@
-# CAREBench Summary Utilities
+# LM-ContextProbe Summary Utilities
 
 **Canonical path:** `shared/reporting/input_summary/utils`
 

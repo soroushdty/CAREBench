@@ -1,8 +1,16 @@
-# CAREBench
+# LM-ContextProbe
 
-**CAREBench** is a research framework for studying how language models respond to patient-level clinical context when classifying sensitive EHR data, and whether those responses match the context-dependent judgment shifts that physicians show.
+> Formerly **CAREBench**. Renamed in October 2026 to avoid confusion with other health-LLM benchmarks of that name ([#19](https://github.com/soroushdty/LM-ContextProbe/issues/19)). Old GitHub links redirect here.
 
-It runs any dataset with human reference labels collected under two conditions: first **without** patient context, then **with** a patient's clinical snapshot. It measures how much a model's judgments move when context is added, and whether they move the same way the human judgments did.
+**LM-ContextProbe** is an evaluation framework for testing whether language models change their judgments with patient context the way physicians do. The built-in task is classifying EHR items into sensitive-data categories; the label set is configurable.
+
+The framework has three parts:
+
+- **A study design.** Human reference observers label each item twice: first **without** patient context, then **with** the patient's clinical snapshot. Track 3 adds a shuffled (wrong-patient) context as a control.
+- **Endpoints with statistical tests.** How much a model's judgments move when context is added, whether they move the same way the human judgments did, and whether that depends on the context belonging to the right patient. Inference is clustered by patient ([`docs/methodology.md`](docs/methodology.md)).
+- **Pipelines that run the design** on any model you configure and any dataset in the paired-context format, or in another format through an adapter.
+
+It is not a benchmark: there is no fixed dataset or leaderboard. You bring the data and the model, and the results describe that dataset's patients and reference observers.
 
 The framework is a **functional analogy to physician decision-making**. Each evaluation track stands for one way a physician could reach a context-dependent judgment: drawing on general clinical knowledge (representation), learning from supervised case experience (adaptation), or deliberating over the chart at decision time (reasoning). Comparing the tracks against the physician reference tests which mechanism reproduces the physicians' context shifts. It does not claim to model how physicians think.
 
@@ -25,7 +33,7 @@ Outputs go to `output/assay/<run_id>/`. To use your own data, see [`docs/data_fo
 The code is organized into three top-level packages (full tree under [Project Structure](#project-structure)):
 
 - **`shared/`**: dataset-agnostic utilities, preprocessing, statistics, evaluation, and the adapter contracts (`shared/adapters/base.py`).
-- **`tracks/`**: the evaluation pipelines: Track 1 representation and Track 3 reasoning. Track 2 (adaptation) is planned ([#13](https://github.com/soroushdty/CAREBench/issues/13)).
+- **`tracks/`**: the evaluation pipelines: Track 1 representation and Track 3 reasoning. Track 2 (adaptation) is planned ([#13](https://github.com/soroushdty/LM-ContextProbe/issues/13)).
 - **`adapters/`**: dataset adapters that translate a dataset into the framework's canonical objects. The built-in `paired_context` adapter serves both tracks.
 
 Dependencies point one way: `tracks/` and `adapters/` import from `shared/`; `shared/` imports from neither, and `adapters/` never imports from `tracks/`. Architecture tests in `tests/architecture/` enforce this.
@@ -35,10 +43,10 @@ Dependencies point one way: `tracks/` and `adapters/` import from `shared/`; `sh
 | Track | Physician analogue | Question | Status |
 |-------|--------------------|----------|--------|
 | 1 – Representation | General clinical knowledge, before any task-specific training | Is the context shift already latent in pretrained knowledge? | Available |
-| 2 – Adaptation | Learning from supervised case experience (clinical training, feedback on real cases) | Can the shift be learned from labelled cases and carried over to new patients? | Planned ([#13](https://github.com/soroushdty/CAREBench/issues/13)) |
+| 2 – Adaptation | Learning from supervised case experience (clinical training, feedback on real cases) | Can the shift be learned from labelled cases and carried over to new patients? | Planned ([#13](https://github.com/soroushdty/LM-ContextProbe/issues/13)) |
 | 3 – Reasoning | Deliberating over the chart at decision time, without changing what the model knows | Does the shift come from reasoning at decision time? | Available |
 
-- **[Track 1 — Representation](tracks/representation/README.md)** (`tracks/representation/`): Bio-ClinicalBERT embedding pipeline, multilabel classifier, context-aware fusion head, LOPO-CV, and statistical analysis of the `directional_alignment` and `brier_improvement` endpoints.
+- **[Track 1 — Representation](tracks/representation/README.md)** (`tracks/representation/`): embedding pipeline (default model Bio_ClinicalBERT), multilabel classifier, context-aware fusion head, LOPO-CV, and statistical analysis of the `directional_alignment` and `brier_improvement` endpoints.
 - **[Track 3 — Reasoning](tracks/reasoning/README.md)** (`tracks/reasoning/`): LLM context-shift assay pipeline. Runs each EHR item under three conditions (context-free, correct-context, shuffled-context) and computes the four Track 3 endpoints against physician judgment shifts.
 
 ### Shared Layer
@@ -49,7 +57,7 @@ The [`shared/`](shared/) directory contains cross-track utilities, preprocessing
 
 ## Research Overview
 
-CAREBench implements an **LLM context-shift assay**. Human reference observers (for example, physicians working in fixed pairs) label EHR item strings into sensitive-data categories under two conditions. First they see the item without patient information (context-free, `reference_context_free`). Then they see it with a structured clinical snapshot of the patient (correct-context, `reference_correct_context`). These matched counterfactual labels allow a direct measurement of context-induced judgment shifts (`delta_reference`).
+Every track uses the same **paired counterfactual design**. Human reference observers (for example, physicians working in fixed pairs) label EHR item strings into sensitive-data categories under two conditions. First they see the item without patient information (context-free, `reference_context_free`). Then they see it with a structured clinical snapshot of the patient (correct-context, `reference_correct_context`). These matched counterfactual labels allow a direct measurement of context-induced judgment shifts (`delta_reference`).
 
 The central question is: **Does a model change its privacy-category judgment when patient context is added, and do those changes match the human judgment shifts?**
 
@@ -69,23 +77,23 @@ Formal definitions of every endpoint, the unit of analysis, the statistical test
 
 ## Origins and Acknowledgments
 
-CAREBench grew out of work in Dr. Adela Grando's **SHARES** project at Arizona State University on patient-controlled, granular segmentation of sensitive health data. Its paired context-free / correct-context design is modeled on the study by Kaufman et al., in which physicians categorized EHR items first without and then with additional patient context:
+LM-ContextProbe grew out of work in Dr. Adela Grando's **SHARES** project at Arizona State University on patient-controlled, granular segmentation of sensitive health data. Its paired context-free / correct-context design is modeled on the study by Kaufman et al., in which physicians categorized EHR items first without and then with additional patient context:
 
 - Kaufman HJ, Banerjee I, Wei M, et al.; Grando MA. *New Automated Granular Data Segmentation Approach: Context Impacts Categorization by Physicians.* JMIR Preprints #66059, 2024. [doi:10.2196/preprints.66059](https://doi.org/10.2196/preprints.66059)
 - Lee P, Dhadwal AS, Kaiser M, Dianaty S, et al.; Grando A. *Assessing the Effectiveness and Scalability of FHIR-Based Granular Data Segmentation Technology.* Appl Clin Inform. 2026;17(3):423–433. [doi:10.1055/a-2863-4129](https://doi.org/10.1055/a-2863-4129)
 
 An early version of this analysis was presented as: Dianaty S, Kaiser M, Murcko A, Grando A. *Early Evidence for Context-Aware Large Language Models (LLMs) in Sensitive Health Data Classification.* AcademyHealth Annual Research Meeting 2026, Seattle, WA, May 30 – Jun 2, 2026.
 
-The study data is not distributed with CAREBench. The bundled example dataset is synthetic.
+The study data is not distributed with LM-ContextProbe. The bundled example dataset is synthetic.
 
 ## Project Status
 
-CAREBench 0.1.0 is an early public release of a research framework, not an established benchmark.
+LM-ContextProbe 0.1.0 is an early public release of an evaluation framework. It has not yet been validated on real data or by simulation.
 
 - **Tested:** both tracks run end to end on the bundled synthetic dataset, under CI.
-- **Not yet available:** results on real data, simulation studies of the endpoints' false-positive rate and power ([#18](https://github.com/soroushdty/CAREBench/issues/18)), a second dataset format, and a configurable label taxonomy. Known gaps in the current statistics are listed in [`docs/methodology.md`](docs/methodology.md#known-limitations).
+- **Not yet available:** results on real data, simulation studies of the endpoints' false-positive rate and power ([#18](https://github.com/soroushdty/LM-ContextProbe/issues/18)), a second dataset format, and a configurable label taxonomy. Known gaps in the current statistics are listed in [`docs/methodology.md`](docs/methodology.md#known-limitations).
 
-**Development history.** CAREBench began as the analysis code for the study described under [Origins and Acknowledgments](#origins-and-acknowledgments) and was developed in a private repository from January to June 2026 (about 800 commits). It was then generalized into a dataset-agnostic framework. This public repository was created from a sanitized snapshot, so that study data and private development material are not in its git history. A short public commit history does not reflect the age of the code.
+**Development history.** LM-ContextProbe began as the analysis code for the study described under [Origins and Acknowledgments](#origins-and-acknowledgments) and was developed in a private repository from January to June 2026 (about 800 commits). It was then generalized into a dataset-agnostic framework. This public repository was created from a sanitized snapshot, so that study data and private development material are not in its git history. A short public commit history does not reflect the age of the code.
 
 ## LLM Context-Shift Assay (Track 3)
 
@@ -223,15 +231,15 @@ Three YAML files control the Stage-1/Stage-2 pipeline:
 
 ## Roadmap
 
-Planned work is tracked in [GitHub issues](https://github.com/soroushdty/CAREBench/issues). None of it is available yet:
+Planned work is tracked in [GitHub issues](https://github.com/soroushdty/LM-ContextProbe/issues). None of it is available yet:
 
 - **Context perturbation suite**: field-level ablation, irrelevant-context insertion, field reordering, and item paraphrasing for the reasoning track, to test whether context shifts come from clinically relevant content.
 - **TRIPOD-LLM report**: an auto-filled TRIPOD-LLM checklist per run, with links to the supporting artifacts and explicit TODOs for author-only items.
 - **Multi-agent reference emulation**: blind LLM rater pairs with consensus and adjudication, mirroring the paired-physician reference design (aligned with the EviTrace multi-agent roadmap).
-- **Track 2 — Adaptation** ([#13](https://github.com/soroushdty/CAREBench/issues/13)): the analogue of a physician learning from supervised case experience. A model is fine-tuned on labelled (patient context, item) cases from training patients, then evaluated on new patients under the same three conditions as Track 3. A learning curve shows how alignment with physicians grows with the number of patients learned from.
-- **Patient-grouped cross-validation** ([#10](https://github.com/soroushdty/CAREBench/issues/10)): shared, configurable splits (leave-one-patient-out or grouped k-fold) for Tracks 1 and 2.
-- **Shuffled-context condition for Track 1** ([#11](https://github.com/soroushdty/CAREBench/issues/11)): a wrong-patient context control, so Track 1 can test whether the model uses *this* patient's context, as Track 3's `context_specificity` does.
-- **Same-model comparison across tracks** ([#12](https://github.com/soroushdty/CAREBench/issues/12)): one model family run frozen, fine-tuned, and prompted, so differences between tracks reflect the mechanism rather than the model.
+- **Track 2 — Adaptation** ([#13](https://github.com/soroushdty/LM-ContextProbe/issues/13)): the analogue of a physician learning from supervised case experience. A model is fine-tuned on labelled (patient context, item) cases from training patients, then evaluated on new patients under the same three conditions as Track 3. A learning curve shows how alignment with physicians grows with the number of patients learned from.
+- **Patient-grouped cross-validation** ([#10](https://github.com/soroushdty/LM-ContextProbe/issues/10)): shared, configurable splits (leave-one-patient-out or grouped k-fold) for Tracks 1 and 2.
+- **Shuffled-context condition for Track 1** ([#11](https://github.com/soroushdty/LM-ContextProbe/issues/11)): a wrong-patient context control, so Track 1 can test whether the model uses *this* patient's context, as Track 3's `context_specificity` does.
+- **Same-model comparison across tracks** ([#12](https://github.com/soroushdty/LM-ContextProbe/issues/12)): one model family run frozen, fine-tuned, and prompted, so differences between tracks reflect the mechanism rather than the model.
 - **Distribution-shift evaluation**: requires a second dataset in the paired-context format.
 - **Other inputs and backends**: FHIR/OMOP ingestion, confidence-weighted or adjudicated reference aggregation, and hosted-API LLM backends.
 
@@ -248,7 +256,7 @@ Planned work is tracked in [GitHub issues](https://github.com/soroushdty/CAREBen
 ## Project Structure
 
 ```
-CAREBench/
+LM-ContextProbe/
 ├── shared/                    # Dataset-agnostic code shared by both tracks
 │   ├── adapters/              # Adapter contracts (protocols, RepresentationDataset)
 │   ├── io/                    # Dataset-neutral Excel reading
@@ -300,7 +308,7 @@ Setting `PYTHONHASHSEED` at runtime (e.g., via `os.environ` in code) has no effe
 
 ## Citation
 
-If you use CAREBench, please cite it using the metadata in [`CITATION.cff`](CITATION.cff), along with the Kaufman et al. study listed under [Origins and Acknowledgments](#origins-and-acknowledgments).
+If you use LM-ContextProbe, please cite it using the metadata in [`CITATION.cff`](CITATION.cff), along with the Kaufman et al. study listed under [Origins and Acknowledgments](#origins-and-acknowledgments).
 
 ## License
 

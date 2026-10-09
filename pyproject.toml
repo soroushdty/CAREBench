@@ -3,9 +3,9 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "carebench"
+name = "lm-contextprobe"
 version = "0.1.0"
-description = "Benchmark framework for context-aware classification of sensitive health data by language models"
+description = "Evaluation framework for testing whether language models shift their sensitive-data judgments with patient context the way physicians do"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Soroush Dianaty" }]

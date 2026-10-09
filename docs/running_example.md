@@ -1,6 +1,6 @@
 # Running the Example
 
-This guide gives commands, prerequisites, expected outputs, and troubleshooting for running CAREBench on the bundled synthetic example dataset (`examples/synthetic/`). To run on your own data, see [`data_format.md`](data_format.md).
+This guide gives commands, prerequisites, expected outputs, and troubleshooting for running LM-ContextProbe on the bundled synthetic example dataset (`examples/synthetic/`). To run on your own data, see [`data_format.md`](data_format.md).
 
 ## Commands
 

@@ -1,10 +1,10 @@
 # Methodology
 
-This document states what CAREBench measures, the study design it assumes, how each endpoint is computed and tested, and which design decisions protect the results from known pitfalls. It describes the code as it is in this repository. Where the code falls short of the intended design, the gap is listed under [Known limitations](#known-limitations).
+LM-ContextProbe is an evaluation framework, not a benchmark: it defines a protocol and runs it on whatever model and dataset you supply. This document specifies that protocol. It states what LM-ContextProbe measures, the study design it assumes, how each endpoint is computed and tested, and which design decisions protect the results from known pitfalls. It describes the code as it is in this repository. Where the code falls short of the intended design, the gap is listed under [Known limitations](#known-limitations).
 
 ## The question
 
-When a clinician sees an EHR item (a diagnosis, a lab result, a medication) on its own, they may file it under one sensitive-data category. With the patient's chart in view, they may file it differently. CAREBench asks whether a language model shows **the same context-induced shifts**:
+When a clinician sees an EHR item (a diagnosis, a lab result, a medication) on its own, they may file it under one sensitive-data category. With the patient's chart in view, they may file it differently. LM-ContextProbe asks whether a language model shows **the same context-induced shifts**:
 
 1. Does the model's judgment change when patient context is added?
 2. Does it change in the same direction as the human judgment?
@@ -13,7 +13,7 @@ When a clinician sees an EHR item (a diagnosis, a lab result, a medication) on i
 
 The last question is what separates *appropriate* context sensitivity from mere sensitivity. A model whose outputs move whenever a chart is pasted into the prompt is context-sensitive. It is only appropriately sensitive if the movement tracks the human shift and disappears when the chart belongs to someone else.
 
-CAREBench does not measure classification accuracy. A model can be accurate and still ignore context, or shift correctly while being poorly calibrated.
+LM-ContextProbe does not measure classification accuracy. A model can be accurate and still ignore context, or shift correctly while being poorly calibrated.
 
 ## Study design the framework assumes
 
@@ -66,7 +66,7 @@ Each track is a functional analogue of one way a physician could reach a context
 | Track | Physician analogue | How the model sees context | Status |
 |-------|--------------------|----------------------------|--------|
 | 1 – Representation | General clinical knowledge | A frozen clinical encoder embeds item and context separately; a small trained head combines them | Available |
-| 2 – Adaptation | Learning from supervised cases | Fine-tuning on labelled (context, item) cases from training patients | Planned ([#13](https://github.com/soroushdty/CAREBench/issues/13)) |
+| 2 – Adaptation | Learning from supervised cases | Fine-tuning on labelled (context, item) cases from training patients | Planned ([#13](https://github.com/soroushdty/LM-ContextProbe/issues/13)) |
 | 3 – Reasoning | Deliberating over the chart | An LLM reads item and context in one prompt and returns category scores | Available |
 
 **Track 1** (`tracks/representation/`) trains a context-free multilabel classifier on frozen encoder embeddings (Stage 1), then a regularized linear fusion head over the item embedding *e* and context embedding *c* (Stage 2). The fusion is configurable (`fusion_strategy`): `2d` = `[e, c]` (default), `3d` adds `e⊙c`, `4_vector` adds `|e−c|`, plus a low-rank bilinear option. The head is fitted to training patients' correct-context labels. All fitting uses nested leave-one-patient-out cross-validation, so every prediction is for a patient the model never saw. Stage 2 is trained only to fit the labels; it has no loss term that rewards agreement with the reference *delta*, so the delta endpoints are not optimized directly.
@@ -84,7 +84,7 @@ Earlier versions numbered hypotheses per track, and the numbers clashed: Track 1
 | `context_sensitivity` | Does adding patient context change the model's scores? | ✓ (formerly H1) | — |
 | `directional_alignment` | Does the score change in the same direction as the reference observers' judgment? | ✓ (formerly H2) | ✓ (formerly H1) |
 | `class_correspondence` | Do the categories that shift most for the reference observers also shift most for the model? | ✓ (formerly H3) | — |
-| `context_specificity` | Is the alignment specific to the correct patient's context, compared with a shuffled context? | ✓ (formerly H4) | — (needs a shuffled condition, [#11](https://github.com/soroushdty/CAREBench/issues/11)) |
+| `context_specificity` | Is the alignment specific to the correct patient's context, compared with a shuffled context? | ✓ (formerly H4) | — (needs a shuffled condition, [#11](https://github.com/soroushdty/LM-ContextProbe/issues/11)) |
 | `brier_improvement` | Does context bring the scores closer to the correct-context reference labels? | — | ✓ (formerly H2) |
 
 ### Track 3 (`shared/evaluation/hypothesis_analyzer.py`)
@@ -121,7 +121,7 @@ Secondary and descriptive outputs: Wasserstein distance to the label distributio
 
 ## Design decisions and what they guard against
 
-Most of the machinery in CAREBench exists because a simpler version gave a misleading answer during development. Each row names the pitfall and the safeguard.
+Most of the machinery in LM-ContextProbe exists because a simpler version gave a misleading answer during development. Each row names the pitfall and the safeguard.
 
 | Pitfall | Safeguard |
 |---------|-----------|
@@ -144,7 +144,7 @@ Results are claims about **the patients and reference observers in the evaluated
 
 These are known gaps between the intended design and the current code.
 
-- **Track 3's `context_sensitivity` and `directional_alignment` have intervals but no reference point.** Mean \|Δ_model\| is above zero for almost any model that reads the context at all, and the chance level of the sign-agreement rate is not 0.5 when zero deltas count as disagreement. The shuffled-context condition provides the natural reference for both. ([#17](https://github.com/soroushdty/CAREBench/issues/17))
+- **Track 3's `context_sensitivity` and `directional_alignment` have intervals but no reference point.** Mean \|Δ_model\| is above zero for almost any model that reads the context at all, and the chance level of the sign-agreement rate is not 0.5 when zero deltas count as disagreement. The shuffled-context condition provides the natural reference for both. ([#17](https://github.com/soroushdty/LM-ContextProbe/issues/17))
 - **`class_correspondence` is a correlation over the number of categories** (ten by default), so it has little power and is best read descriptively.
-- **No simulation-based validation yet.** The false-positive rate and power of the endpoints under known effects have not been measured. ([#18](https://github.com/soroushdty/CAREBench/issues/18))
-- **One label taxonomy** ([#5](https://github.com/soroushdty/CAREBench/issues/5)) and **one dataset format** ([#6](https://github.com/soroushdty/CAREBench/issues/6)) so far.
+- **No simulation-based validation yet.** The false-positive rate and power of the endpoints under known effects have not been measured. ([#18](https://github.com/soroushdty/LM-ContextProbe/issues/18))
+- **One label taxonomy** ([#5](https://github.com/soroushdty/LM-ContextProbe/issues/5)) and **one dataset format** ([#6](https://github.com/soroushdty/LM-ContextProbe/issues/6)) so far.

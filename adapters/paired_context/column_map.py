@@ -17,7 +17,7 @@ from typing import Any
 class PairedContextColumnMap:
     """Typed, immutable mapping of paired-context dataset field names and conventions.
 
-    Default values correspond to the default CAREBench paired-context schema used by
+    Default values correspond to the default LM-ContextProbe paired-context schema used by
     the bundled synthetic example (``examples/synthetic/dataset.xlsx``). Use
     :meth:`from_config` to build a map from a run configuration.
 

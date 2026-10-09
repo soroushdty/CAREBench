@@ -1,4 +1,4 @@
-# CAREBench Training Shared Utilities
+# LM-ContextProbe Training Shared Utilities
 
 **Canonical path:** `tracks/representation/training/shared`
 
@@ -20,7 +20,7 @@ For the high-level pipeline flow that consumes these utilities, see the parent [
 
 ## `soft_label_utils.py`
 
-CAREBench labels are continuous values in `[0, 1]` representing physician-pair agreement fractions (e.g. `0.5` denotes a tied disagreement within a pair). Standard `sklearn.metrics` functions reject non-binary `y_true` arrays, so this module re-implements the metric set natively for soft fractional targets.
+LM-ContextProbe labels are continuous values in `[0, 1]` representing physician-pair agreement fractions (e.g. `0.5` denotes a tied disagreement within a pair). Standard `sklearn.metrics` functions reject non-binary `y_true` arrays, so this module re-implements the metric set natively for soft fractional targets.
 
 ### Tie-handling convention
 

@@ -1,4 +1,4 @@
-# CAREBench Summary Outputs
+# LM-ContextProbe Summary Outputs
 
 **Canonical path:** `shared/reporting/input_summary/outputs`
 

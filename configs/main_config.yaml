@@ -49,7 +49,22 @@ llm: emilyalsentzer/Bio_ClinicalBERT
 llm_revision: main
 hf_local_files_only: false
 tokenizer_model_max_length: 512
+# pooling: mean | max | none (first token, [CLS] for BERT) | attention-weighted
+#          | simcse | last_token (last non-padding token; use for decoder LLMs)
 pooling: mean
+# embedding_backend:
+#   auto                  → SentenceTransformer when pooling is mean (falls back
+#                           to transformers if that fails), transformers otherwise
+#   transformers          → AutoModel with the pooling above (use for decoders)
+#   sentence_transformers → SentenceTransformer only; the model's own pooling
+#                           applies, so pooling must be mean
+embedding_backend: auto
+# Load the embedding model in float32 | float16 | bfloat16 (null → checkpoint
+# default). Half precision is what makes 7B-scale decoders fit in memory.
+embedding_dtype: null
+# Passed to from_pretrained as device_map (e.g. auto) to spread a large model
+# over devices; requires the accelerate package. null → one device.
+embedding_device_map: null
 
 # SUMMARY GENERATION CONTROLS
 ENABLE_SUMMARY: true

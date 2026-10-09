@@ -46,7 +46,7 @@ Dependencies point one way: `tracks/` and `adapters/` import from `shared/`; `sh
 | 2 – Adaptation | Learning from supervised case experience (clinical training, feedback on real cases) | Can the shift be learned from labelled cases and carried over to new patients? | Planned ([#13](https://github.com/soroushdty/LM-ContextProbe/issues/13)) |
 | 3 – Reasoning | Deliberating over the chart at decision time, without changing what the model knows | Does the shift come from reasoning at decision time? | Available |
 
-- **[Track 1 — Representation](tracks/representation/README.md)** (`tracks/representation/`): embedding pipeline (default model Bio_ClinicalBERT), multilabel classifier, context-aware fusion head, patient-grouped cross-validation (leave-one-patient-out or grouped k-fold), and statistical analysis of the `directional_alignment` and `brier_improvement` endpoints.
+- **[Track 1 — Representation](tracks/representation/README.md)** (`tracks/representation/`): embedding pipeline (default model Bio_ClinicalBERT; decoder LLMs also work, see [`shared/embeddings/`](shared/embeddings/README.md)), multilabel classifier, context-aware fusion head, patient-grouped cross-validation (leave-one-patient-out or grouped k-fold), and statistical analysis of the `directional_alignment` and `brier_improvement` endpoints.
 - **[Track 3 — Reasoning](tracks/reasoning/README.md)** (`tracks/reasoning/`): LLM prompting pipeline. Runs each EHR item under three conditions (context-free, correct-context, shuffled-context) and computes the four Track 3 endpoints against physician judgment shifts.
 
 ### Shared Layer

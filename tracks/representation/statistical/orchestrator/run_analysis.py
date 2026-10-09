@@ -578,9 +578,15 @@ def run_statistical_analysis(
     # ------------------------------------------------------------------
     if arch_predictions:
         from ..reporting.arch_compare import arch_comparison_table
+        # Width of the item/context vectors entering Stage 2.
+        _stage2_dim = cfg.get("stage2_pca_n_components") or (
+            X_items_test.shape[1] if X_items_test is not None else None
+        )
         arch_df = arch_comparison_table(
             arch_predictions, y_interview, class_list,
             patient_ids, avg_thresh_f1opt, n_resamples, rng,
+            embedding_dim=int(_stage2_dim) if _stage2_dim is not None else None,
+            lowrank_r=int(cfg.get("lowrank_bilinear_r", 8)),
         )
         _save_csv(output_dir / "arch_comparison.csv", arch_df)
         logger.info("Arch comparison done: %d architectures.", len(arch_predictions))

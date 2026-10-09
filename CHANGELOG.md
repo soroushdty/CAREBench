@@ -4,6 +4,13 @@
 
 The first archived release (Zenodo DOI). Endpoints and tests are **protocol v1**.
 
+- **Decoder LLMs as the Track 1 representation model** (#29). The embedding code assumed a BERT-style encoder. A decoder model (for example the family Track 3 prompts) now works as `llm`, see `shared/embeddings/README.md`:
+  - `pooling: last_token` takes the last non-padding token, the only one that has seen the whole input under causal attention. `pooling: none` (first token) on a decoder logs a warning.
+  - `embedding_backend` (`auto`, `transformers`, `sentence_transformers`). `auto`, the default, keeps the old behaviour for `pooling: mean`. For any other pooling it now goes straight to `transformers`, because the SentenceTransformer path used to ignore `pooling` and silently apply mean pooling. **A config with `pooling` other than `mean` and the default backend now gives different embeddings than before**, and the run logs a warning saying so.
+  - When the tokenizer has no padding token, it pads with EOS, on the right, so a text's vector doesn't depend on its batch.
+  - `embedding_dtype` (`float32`/`float16`/`bfloat16`) and `embedding_device_map` load large models in half precision and across devices.
+  - The architecture comparison's `param_count` uses the actual vector width instead of assuming d = 768, and the 4-vector count is corrected (it said 30,720 per class at d = 768; it is 3,072).
+  - With the default Bio_ClinicalBERT settings, Track 1 outputs are unchanged.
 - **Configurable patient-grouped cross-validation** (#10). Track 1's outer and inner loops were always leave-one-patient-out, which needs N outer × (N−1) inner fits for N patients. Each loop can now use grouped k-fold instead: `cv: {outer: {scheme, n_splits, seed}, inner: {...}}` in `configs/training_config.yaml`, with `scheme` either `lopo` (default) or `group_kfold`. The split code moved from `tracks/representation/training/shared/lopo_cv.py` to `shared/cv/` so Track 2 can use it.
   - Every split holds out whole patients. Code that assumed one held-out patient per fold now handles several: Stage 2 excludes all of the fold's held-out patients from its training rows, and fold-pure scoring scores each test row with the fold that held out that row's patient.
   - `run_manifest.json` gains a `cv` object with the schemes and each outer fold's held-out patients and inner-fold patients. `model/fold_manifest.json` gains `cv` and per-fold `held_out_patient_ids`; `held_out_patient_id` is `null` for folds that hold out several patients.

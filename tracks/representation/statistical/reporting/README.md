@@ -56,14 +56,14 @@ filled with NaN and a warning is logged.
 | `delta_f1_vs_ref`                               | F1 difference vs reference (positive = better)              |
 | `delta_f1_ci_lower` / `delta_f1_ci_upper`       | 95% CI on F1 difference                                     |
 
-**Architecture parameter counts** (at `d = 768`):
+**Architecture parameter counts.** `d` is the width of the item and context vectors entering Stage 2: the embedding width, or `stage2_pca_n_components` when set. The `param_count` column gives the count at the run's `d` (examples below at `d = 768`).
 
 | Key                | Description                                        | Param count          |
 | ------------------ | -------------------------------------------------- | -------------------- |
-| `4_vector`         | `[e_i, c_p, e_i * c_p, \|e_i − c_p\|]` (reference) | 30,720 / class       |
-| `2d`               | `[e_i, c_p]`                                       | 1,536 / class        |
-| `3d`               | `[e_i, c_p, e_i * c_p]`                            | 2,304 / class        |
-| `lowrank_bilinear` | `[e_i, c_p]` with LowRankBilinear head             | 12,288 / class (r=8) |
+| `4_vector`         | `[e_i, c_p, e_i * c_p, \|e_i − c_p\|]` (reference) | 4d: 3,072 / class    |
+| `2d`               | `[e_i, c_p]`                                       | 2d: 1,536 / class    |
+| `3d`               | `[e_i, c_p, e_i * c_p]`                            | 3d: 2,304 / class    |
+| `lowrank_bilinear` | `[e_i, c_p]` with LowRankBilinear head             | 2·d·r: 12,288 / class (r=8) |
 | `passthrough`      | Context concatenated but no learned parameters     | 0                    |
 | `patient_id`       | Patient ID embedding lookup                        | d + n_patients       |
 | `stage1_only`      | Stage 1 predictions, no Stage 2                    | 0                    |

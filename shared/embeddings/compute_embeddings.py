@@ -28,7 +28,9 @@ warnings.filterwarnings("ignore", message="IProgress not found.*", category=Tqdm
 
 logger = logging.getLogger(__name__)
 
-_VALID_POOLING = {"mean", "max", "none", "attention-weighted", "simcse"}
+_VALID_POOLING = {"mean", "max", "none", "attention-weighted", "simcse", "last_token"}
+_VALID_BACKENDS = {"auto", "sentence_transformers", "transformers"}
+_VALID_DTYPES = {"float32", "float16", "bfloat16"}
 
 
 # ---------------------------------------------------------------------------
@@ -61,6 +63,24 @@ def _max_pooling(last_hidden_state: torch.Tensor, pooling_mask: torch.Tensor) ->
     pooled, _ = torch.max(masked, dim=1)
     pooled[torch.isinf(pooled)] = 0.0
     return pooled
+
+
+def _last_token_pooling(last_hidden_state: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+    """Hidden state of each sequence's last non-padding token.
+
+    Under causal attention only the last token has seen the whole input, so
+    this is the pooling for decoder models. Works for left or right padding.
+    """
+    seq_len = attention_mask.size(1)
+    last = seq_len - 1 - attention_mask.flip(dims=[1]).int().argmax(dim=1)
+    rows = torch.arange(last_hidden_state.size(0), device=last_hidden_state.device)
+    return last_hidden_state[rows, last]
+
+
+def _is_causal_lm(model: Any) -> bool:
+    """True when the checkpoint was saved as a causal (decoder) language model."""
+    architectures = getattr(model.config, "architectures", None) or []
+    return any("CausalLM" in a or "LMHead" in a for a in architectures)
 
 
 def _attention_weighted_pooling(
@@ -128,6 +148,19 @@ def embedding(
                         hf_local_files_only     (bool)
                         tokenizer_model_max_length (int, fallback default: 512)
                         pooling                 (str; default: mean)
+                            last_token: hidden state of the last non-padding
+                            token; use it for decoder models.
+                        embedding_backend       (str; default: auto)
+                            auto: SentenceTransformer when pooling is mean,
+                            falling back to transformers if it fails;
+                            transformers otherwise.
+                            sentence_transformers: SentenceTransformer only;
+                            the model's own pooling applies.
+                            transformers: AutoModel with cfg['pooling'].
+                        embedding_dtype         (str; float32 | float16 | bfloat16;
+                                                 default: the checkpoint's loading default)
+                        embedding_device_map    (str or dict, passed to from_pretrained;
+                                                 default: load on one device)
                         # SimCSE: Gao, Tianyu, Xingcheng Yao, and Danqi Chen.
                         # "SimCSE: Simple Contrastive Learning of Sentence Embeddings."
                         # Version 4. Preprint, arXiv, 2021.
@@ -148,6 +181,22 @@ def embedding(
         valid = ", ".join(sorted(_VALID_POOLING))
         raise ValueError(f"Invalid cfg['pooling']={pooling!r}. Valid options: {valid}.")
 
+    backend = str(cfg.get("embedding_backend") or "auto")
+    if backend not in _VALID_BACKENDS:
+        valid = ", ".join(sorted(_VALID_BACKENDS))
+        raise ValueError(f"Invalid cfg['embedding_backend']={backend!r}. Valid options: {valid}.")
+    if backend == "sentence_transformers" and pooling != "mean":
+        raise ValueError(
+            f"cfg['pooling']={pooling!r} needs embedding_backend 'transformers' or 'auto': "
+            "the sentence_transformers backend uses the model's own pooling."
+        )
+
+    dtype_name = cfg.get("embedding_dtype")
+    if dtype_name is not None and dtype_name not in _VALID_DTYPES:
+        valid = ", ".join(sorted(_VALID_DTYPES))
+        raise ValueError(f"Invalid cfg['embedding_dtype']={dtype_name!r}. Valid options: {valid}.")
+    device_map = cfg.get("embedding_device_map")
+
     unique_texts = sorted({t for t in texts if isinstance(t, str) and t.strip()})
     if not unique_texts:
         logger.warning("embedding(): no valid strings remain after deduplication.")
@@ -161,41 +210,76 @@ def embedding(
     llm_revision = cfg.get("llm_revision")
     local_files_only = bool(cfg.get("hf_local_files_only", False))
 
+    # Loading options only passed when configured, so the default load is unchanged.
+    model_kwargs: dict[str, Any] = {}
+    if dtype_name is not None:
+        model_kwargs["dtype"] = getattr(torch, dtype_name)
+    if device_map is not None:
+        model_kwargs["device_map"] = device_map
+
     logger.info("Computing embeddings — model: %s | unique texts: %d", model_id, len(unique_texts))
 
+    use_sentence_transformers = backend == "sentence_transformers" or (
+        backend == "auto" and pooling == "mean"
+    )
+
     # --- primary path: SentenceTransformer ---
-    try:
-        logger.info("Loading %s as SentenceTransformer...", model_id)
-        model = SentenceTransformer(
-            model_id,
-            device=str(device),
-            revision=llm_revision,
-            local_files_only=local_files_only,
+    if not use_sentence_transformers:
+        logger.info(
+            "Loading %s with transformers AutoModel (embedding_backend=%s, pooling=%s).",
+            model_id, backend, pooling,
         )
-        embeddings = model.encode(
-            unique_texts,
-            batch_size=batch_size,
-            show_progress_bar=True,
-            convert_to_numpy=True,
-        )
-        embeddings = _l2_normalize(embeddings)
+        if backend == "auto":
+            # Before #29, auto loaded a SentenceTransformer whatever the pooling,
+            # so it silently applied mean pooling.
+            logger.warning(
+                "pooling=%r now applies with embedding_backend 'auto'. Before LM-ContextProbe "
+                "0.2.0, 'auto' ignored pooling and used mean pooling, so these embeddings "
+                "differ from runs of the same config with earlier versions.",
+                pooling,
+            )
+    else:
+        try:
+            logger.info("Loading %s as SentenceTransformer...", model_id)
+            st_kwargs: dict[str, Any] = {}
+            if model_kwargs:
+                st_kwargs["model_kwargs"] = model_kwargs
+            model = SentenceTransformer(
+                model_id,
+                device=None if device_map is not None else str(device),
+                revision=llm_revision,
+                local_files_only=local_files_only,
+                **st_kwargs,
+            )
+            embeddings = model.encode(
+                unique_texts,
+                batch_size=batch_size,
+                show_progress_bar=True,
+                convert_to_numpy=True,
+            )
+            embeddings = _l2_normalize(np.asarray(embeddings, dtype=np.float32))
 
-        del model
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        gc.collect()
+            del model
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
 
-        return {text: embeddings[i] for i, text in enumerate(unique_texts)}
+            return {text: embeddings[i] for i, text in enumerate(unique_texts)}
 
-    except Exception as e:
-        if local_files_only:
-            raise RuntimeError(
-                f"Model load failed in local-only mode for '{model_id}' "
-                f"(revision='{llm_revision}'). Ensure artifacts are pre-cached. "
-                f"Original error: {e}"
-            ) from e
+        except Exception as e:
+            if backend == "sentence_transformers":
+                raise RuntimeError(
+                    f"SentenceTransformer failed to load or encode '{model_id}' and "
+                    f"embedding_backend is 'sentence_transformers'. Original error: {e}"
+                ) from e
+            if local_files_only:
+                raise RuntimeError(
+                    f"Model load failed in local-only mode for '{model_id}' "
+                    f"(revision='{llm_revision}'). Ensure artifacts are pre-cached, "
+                    f"or set embedding_backend: transformers. Original error: {e}"
+                ) from e
 
-        logger.warning("SentenceTransformer failed (%s). Falling back to AutoModel...", e)
+            logger.warning("SentenceTransformer failed (%s). Falling back to AutoModel...", e)
 
     # --- fallback path: AutoModel + manual pooling ---
     tokenizer = AutoTokenizer.from_pretrained(
@@ -213,6 +297,18 @@ def embedding(
         )
     tokenizer.model_max_length = cfg.get("tokenizer_model_max_length", safe_max)
 
+    # Many decoder tokenizers have no padding token; pad with EOS. Pad on the
+    # right so real tokens keep positions 0..n-1 whatever the batch.
+    if tokenizer.pad_token is None:
+        if tokenizer.eos_token is None:
+            raise ValueError(
+                f"Tokenizer for '{model_id}' has neither a padding nor an EOS token; "
+                "batched embedding needs one of them."
+            )
+        logger.info("Tokenizer for '%s' has no padding token; using EOS (%r).", model_id, tokenizer.eos_token)
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "right"
+
     sep_id = tokenizer.sep_token_id
     pad_id = tokenizer.pad_token_id
 
@@ -220,8 +316,16 @@ def embedding(
         model_id,
         revision=llm_revision,
         local_files_only=local_files_only,
+        **model_kwargs,
     )
-    model.to(device)
+    if device_map is None:
+        model.to(device)
+    input_device = model.get_input_embeddings().weight.device
+    if pooling == "none" and _is_causal_lm(model):
+        logger.warning(
+            "pooling='none' takes the first token, which in a decoder model has seen "
+            "nothing else in the input. Use pooling='last_token' for '%s'.", model_id,
+        )
     if pooling == "simcse":
         model.train()
     else:
@@ -238,8 +342,8 @@ def embedding(
                 max_length=tokenizer.model_max_length,
                 return_tensors="pt",
             )
-            input_ids = enc["input_ids"].to(device)
-            attention_mask = enc["attention_mask"].to(device)
+            input_ids = enc["input_ids"].to(input_device)
+            attention_mask = enc["attention_mask"].to(input_device)
             pooling_mask = _build_pooling_mask(input_ids, attention_mask, sep_id, pad_id)
 
             if pooling == "none":
@@ -249,6 +353,14 @@ def embedding(
                     return_dict=True,
                 )
                 pooled = outputs.last_hidden_state[:, 0, :]
+
+            elif pooling == "last_token":
+                outputs = model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    return_dict=True,
+                )
+                pooled = _last_token_pooling(outputs.last_hidden_state, attention_mask)
 
             elif pooling == "max":
                 outputs = model(
@@ -294,7 +406,7 @@ def embedding(
                 )
                 pooled = _mean_pooling(outputs.last_hidden_state, pooling_mask)
 
-            all_embeddings.extend(pooled.cpu().numpy())
+            all_embeddings.extend(pooled.float().cpu().numpy())
 
     del model
     if torch.cuda.is_available():

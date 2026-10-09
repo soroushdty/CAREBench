@@ -24,6 +24,13 @@ import math
 import os
 from typing import Any
 
+from shared.endpoints import (
+    CLASS_CORRESPONDENCE,
+    CONTEXT_SENSITIVITY,
+    CONTEXT_SPECIFICITY,
+    DIRECTIONAL_ALIGNMENT,
+    Endpoint,
+)
 from shared.label_space import DEFAULT_LABEL_SPACE, LabelSpace
 
 # ---------------------------------------------------------------------------
@@ -101,7 +108,7 @@ class ReportGenerator:
     h2_per_category:
         Optional dict mapping output_dimension name → dict with
         ``sign_agreement_rate``, ``ci_lower``, ``ci_upper``.
-        If ``None``, the per-category H2 section notes that the
+        If ``None``, the per-category directional-alignment section notes that the
         breakdown is not available.
     label_space:
         Optional :class:`~shared.label_space.LabelSpace`. Results are looked
@@ -109,6 +116,10 @@ class ReportGenerator:
     category_type:
         Word placed before "categories" in the report text (the assay
         config's ``prompt.category_type``; ``""`` for none).
+    legacy_aliases:
+        Optional endpoint name → old hypothesis number (e.g.
+        ``{"context_sensitivity": "H1"}``), shown in headings as
+        "(formerly H1)".
     """
 
     def __init__(
@@ -126,6 +137,7 @@ class ReportGenerator:
         n_task_pairs: int | None = None,
         label_space: LabelSpace | None = None,
         category_type: str = "privacy",
+        legacy_aliases: dict[str, str] | None = None,
     ) -> None:
         self._h1 = h1_result
         self._h2 = h2_result
@@ -143,6 +155,7 @@ class ReportGenerator:
             self._category_labels = list(self._category_names)
         self._h2_per_category = h2_per_category
         self._category_type = category_type.strip()
+        self._legacy_aliases = dict(legacy_aliases or {})
         self._is_dry_run = is_dry_run
         self._n_context_entities = n_context_entities
         self._n_task_pairs = n_task_pairs
@@ -189,6 +202,11 @@ class ReportGenerator:
         if self._n_context_entities is None:
             return "patients"
         return f"**{self._n_context_entities} patients**"
+
+    def _heading(self, endpoint: Endpoint) -> str:
+        """Endpoint title, with its legacy hypothesis number if one is known."""
+        alias = self._legacy_aliases.get(endpoint.name)
+        return f"{endpoint.title} (formerly {alias})" if alias else endpoint.title
 
     def _categories(self) -> str:
         """``"privacy categories"``, or ``"categories"`` with no category type."""
@@ -260,7 +278,7 @@ class ReportGenerator:
             "(context_entity_id) with replacement "
             "to respect within-patient correlation. Permutation tests use 10 000 "
             "permutations. P-values are one-sided (fraction of permuted statistics "
-            "≥ observed statistic). The H4 test is a patient-cluster sign-flip test: "
+            "≥ observed statistic). The context-specificity test is a patient-cluster sign-flip test: "
             "each patient's cells are flipped together, and with few patients all "
             "sign patterns are enumerated, so the smallest attainable p-value is "
             "2^−(number of patients).\n\n"
@@ -288,14 +306,14 @@ class ReportGenerator:
         ci = _fmt_ci(h1.get("ci_lower"), h1.get("ci_upper"))
 
         lines = [
-            "### H1 — Context Sensitivity\n",
+            f"### {self._heading(CONTEXT_SENSITIVITY)}\n",
             f"**Hypothesis:** The LLM (candidate_id) changes its {self._category_adjective()} "
             "scores (output_dimension) when patient context (context_entity_id) "
             "is added (mean absolute Delta_LLM_Correct > 0).\n",
             f"- **Aggregate mean absolute delta:** {point}  ",
             f"- **95% CI:** {ci}\n",
             "#### Per-Category Breakdown\n",
-            "| Category | Mean |Abs| Delta | 95% CI |",
+            "| Category | Mean Absolute Delta | 95% CI |",
             "|---|---|---|",
         ]
 
@@ -316,7 +334,7 @@ class ReportGenerator:
         ci_sign = _fmt_ci(h2.get("ci_lower_sign_agree"), h2.get("ci_upper_sign_agree"))
 
         lines = [
-            "### H2 — Directional Physician Alignment\n",
+            f"### {self._heading(DIRECTIONAL_ALIGNMENT)}\n",
             "**Hypothesis:** LLM context-induced deltas are directionally aligned "
             "with reference_observer judgment deltas (delta_reference; restricted "
             "to cells where delta_reference ≠ 0).\n",
@@ -339,8 +357,9 @@ class ReportGenerator:
                 lines.append(f"| {label} | {rate} | {cat_ci} |")
         else:
             lines.append(
-                "*Per-category H2 breakdown not available in the current implementation. "
-                "H2 is computed on the aggregate set of non-zero delta_reference cells.*"
+                "*Per-category directional-alignment breakdown not available in the current "
+                "implementation. It is computed on the aggregate set of non-zero "
+                "delta_reference cells.*"
             )
 
         return "\n".join(lines)
@@ -355,7 +374,7 @@ class ReportGenerator:
         mean_dl = h3.get("mean_delta_llm")
 
         lines = [
-            "### H3 — Class-Level Correspondence\n",
+            f"### {self._heading(CLASS_CORRESPONDENCE)}\n",
             "**Hypothesis:** The pattern of LLM context effects across "
             f"{self._categories()} (output_dimension) correlates with the pattern of "
             "reference_observer judgment shifts (delta_reference) "
@@ -387,11 +406,11 @@ class ReportGenerator:
     def _subsection_h4(self) -> str:
         h4 = self._h4
 
-        # Handle skipped H4 (shuffled-context absent)
+        # Handle skipped context specificity (shuffled-context absent)
         if h4.get("status") == "skipped":
             reason = h4.get("reason", "unknown reason")
             lines = [
-                "### H4 — Correct vs Shuffled Context Control\n",
+                f"### {self._heading(CONTEXT_SPECIFICITY)}\n",
                 "**Hypothesis:** Correct patient context (reference_correct_context) "
                 "produces greater directional alignment with reference_observer deltas "
                 "(delta_reference) than shuffled (mismatched) context "
@@ -405,7 +424,7 @@ class ReportGenerator:
         p_val = _fmt_p(h4.get("p_value"))
 
         lines = [
-            "### H4 — Correct vs Shuffled Context Control\n",
+            f"### {self._heading(CONTEXT_SPECIFICITY)}\n",
             "**Hypothesis:** Correct patient context (reference_correct_context) "
             "produces greater directional alignment with reference_observer deltas "
             "(delta_reference) than shuffled (mismatched) context "
@@ -427,31 +446,31 @@ class ReportGenerator:
 
         rows = [
             (
-                "H1 — Context Sensitivity",
+                f"{CONTEXT_SENSITIVITY.title} (mean absolute delta)",
                 _fmt(h1.get("mean_abs_delta")),
                 _fmt_ci(h1.get("ci_lower"), h1.get("ci_upper")),
                 "—",
             ),
             (
-                "H2 — Sign Agreement Rate",
+                f"{DIRECTIONAL_ALIGNMENT.title} (sign agreement rate)",
                 _fmt(h2.get("sign_agreement_rate")),
                 _fmt_ci(h2.get("ci_lower_sign_agree"), h2.get("ci_upper_sign_agree")),
                 "—",
             ),
             (
-                "H2 — Mean Alignment",
+                f"{DIRECTIONAL_ALIGNMENT.title} (mean alignment)",
                 _fmt(h2.get("mean_alignment")),
                 _fmt_ci(h2.get("ci_lower_alignment"), h2.get("ci_upper_alignment")),
                 "—",
             ),
             (
-                "H3 — Class-Level Correlation (r)",
+                f"{CLASS_CORRESPONDENCE.title} (r)",
                 _fmt(h3.get("pearson_r")),
                 "—",
                 _fmt_p(h3.get("p_value")),
             ),
             (
-                "H4 — Correct vs Shuffled (mean diff)",
+                f"{CONTEXT_SPECIFICITY.title} (correct − shuffled mean diff)",
                 _fmt(h4.get("mean_diff")) if h4.get("status") != "skipped" else "Skipped",
                 _fmt_ci(h4.get("ci_lower"), h4.get("ci_upper")) if h4.get("status") != "skipped" else "—",
                 _fmt_p(h4.get("p_value")) if h4.get("status") != "skipped" else "—",

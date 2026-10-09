@@ -1,8 +1,11 @@
 """
 Hypothesis Analyzer for the LLM Context-Shift Assay.
 
-Computes H1–H4 statistical endpoints with patient-cluster bootstrap CIs
-and permutation test p-values (H4: patient-cluster sign-flip test).
+Computes Track 3's endpoints (shared/endpoints.py) with patient-cluster
+bootstrap CIs and permutation-test p-values: context sensitivity (formerly
+H1), directional alignment (H2), class-level correspondence (H3) and context
+specificity (H4, patient-cluster sign-flip test). Method names keep the old
+numbers (compute_h1 ... compute_h4).
 
 Reuses ``shared.statistical.bootstrap.patient_block_bootstrap`` for
 all bootstrap confidence intervals.
@@ -190,7 +193,7 @@ def permutation_test_h4(
 
 
 class HypothesisAnalyzer:
-    """Computes H1–H4 statistical endpoints for the LLM context-shift assay.
+    """Computes Track 3's four endpoints (formerly H1–H4) for the LLM context-shift assay.
 
     Parameters
     ----------

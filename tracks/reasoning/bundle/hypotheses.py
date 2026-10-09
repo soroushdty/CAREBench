@@ -1,5 +1,7 @@
 """
-H1–H4 hypothesis computation for the analysis bundle pipeline.
+Endpoint computation for the analysis bundle pipeline (shared/endpoints.py):
+context sensitivity, directional alignment, class-level correspondence and
+context specificity (formerly Track 3's H1–H4).
 
 Each function accepts a ``cells_df`` (paired cell deltas for a single model),
 the model name, and statistical parameters.  All CIs use patient-cluster
@@ -78,7 +80,7 @@ def _permutation_test_spearman(
 
 
 # ---------------------------------------------------------------------------
-# H1 — LLM Context Sensitivity
+# Context sensitivity (formerly H1)
 # ---------------------------------------------------------------------------
 
 
@@ -90,7 +92,7 @@ def compute_h1(
     n_bootstrap: int = 1000,
     seed: int = 2026,
 ) -> pd.DataFrame:
-    """Compute H1: context sensitivity for correct and shuffled conditions.
+    """Compute context sensitivity (formerly H1) for correct and shuffled conditions.
 
     Parameters
     ----------
@@ -191,7 +193,7 @@ def _nan_h1_row(model: str, category: str, epsilon: float) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# H2 — Directional Alignment with Physician Shifts
+# Directional alignment (formerly H2)
 # ---------------------------------------------------------------------------
 
 
@@ -203,7 +205,7 @@ def compute_h2(
     n_bootstrap: int = 1000,
     seed: int = 2026,
 ) -> pd.DataFrame:
-    """Compute H2: directional alignment (correct and shuffled) where Δ_physician ≠ 0.
+    """Compute directional alignment (formerly H2) (correct and shuffled) where Δ_physician ≠ 0.
 
     Parameters
     ----------
@@ -302,7 +304,7 @@ def _nan_h2_row(model: str, category: str, epsilon: float) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# H3 — Class-Level Context-Effect Correspondence
+# Class-level correspondence (formerly H3)
 # ---------------------------------------------------------------------------
 
 
@@ -313,7 +315,7 @@ def compute_h3(
     n_permutations: int = 10000,
     seed: int = 2026,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Compute H3: class-level correspondence between physician and LLM deltas.
+    """Compute class-level correspondence (formerly H3) between physician and LLM deltas.
 
     Parameters
     ----------
@@ -453,7 +455,7 @@ def _nan_h3_effect_row(model: str, category: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# H4 — Correct vs Shuffled Context Control
+# Context specificity: correct vs shuffled context (formerly H4)
 # ---------------------------------------------------------------------------
 
 
@@ -465,7 +467,7 @@ def compute_h4(
     n_permutations: int = 10000,
     seed: int = 2026,
 ) -> pd.DataFrame:
-    """Compute H4: correct-context alignment vs shuffled-context (Δ_physician ≠ 0).
+    """Compute context specificity (formerly H4): correct-context alignment vs shuffled-context (Δ_physician ≠ 0).
 
     Parameters
     ----------

@@ -75,24 +75,26 @@ Each track is a functional analogue of one way a physician could reach a context
 
 ## Endpoints
 
-The two tracks currently number their hypotheses differently. The table maps them to the underlying questions. A shared, named set of endpoints is planned ([#15](https://github.com/soroushdty/CAREBench/issues/15)).
+Endpoints are named once, in `shared/endpoints.py`, and every track writes its results under those names. Each track declares which endpoints it computes (`tracks/reasoning/endpoints.py`, `tracks/representation/statistical/endpoints.py`). The statistic and test can differ between tracks; the tables below give each track's.
 
-| Question | Track 3 | Track 1 |
-|----------|---------|---------|
-| Does context change the model's scores? | H1 | — |
-| Does it change in the reference direction? | H2 | H1 |
-| Do class-level shifts correspond? | H3 | — |
-| Is the alignment specific to the correct patient? | H4 | — (needs a shuffled condition, [#11](https://github.com/soroushdty/CAREBench/issues/11)) |
-| Does context bring scores closer to the correct-context labels? | — | H2 |
+Earlier versions numbered hypotheses per track, and the numbers clashed: Track 1's H1 was Track 3's H2. The old numbers appear only as "(formerly H*n*)" in report headings.
+
+| Endpoint | Question | Track 3 | Track 1 |
+|----------|----------|---------|---------|
+| `context_sensitivity` | Does adding patient context change the model's scores? | ✓ (formerly H1) | — |
+| `directional_alignment` | Does the score change in the same direction as the reference observers' judgment? | ✓ (formerly H2) | ✓ (formerly H1) |
+| `class_correspondence` | Do the categories that shift most for the reference observers also shift most for the model? | ✓ (formerly H3) | — |
+| `context_specificity` | Is the alignment specific to the correct patient's context, compared with a shuffled context? | ✓ (formerly H4) | — (needs a shuffled condition, [#11](https://github.com/soroushdty/CAREBench/issues/11)) |
+| `brier_improvement` | Does context bring the scores closer to the correct-context reference labels? | — | ✓ (formerly H2) |
 
 ### Track 3 (`shared/evaluation/hypothesis_analyzer.py`)
 
 | | Statistic | Uncertainty / test |
 |---|---|---|
-| **H1 – Context sensitivity** | Mean \|Δ_model\| over all cells, overall and per category | Patient-cluster bootstrap 95% CI |
-| **H2 – Directional alignment** | On cells with Δ_ref ≠ 0: mean alignment `sign(Δ_ref)·Δ_model`, and sign-agreement rate `sign(Δ_model) = sign(Δ_ref)` | Patient-cluster bootstrap 95% CIs |
-| **H3 – Class-level correspondence** | Pearson *r* between the per-category mean Δ_ref and mean Δ_model | One-sided permutation test over category labels |
-| **H4 – Correct vs shuffled context** | On cells with Δ_ref ≠ 0: mean of `sign(Δ_ref)·(Δ_model − Δ_shuffled)` | Patient-cluster bootstrap 95% CI; one-sided patient-cluster sign-flip test |
+| **`context_sensitivity`** | Mean \|Δ_model\| over all cells, overall and per category | Patient-cluster bootstrap 95% CI |
+| **`directional_alignment`** | On cells with Δ_ref ≠ 0: mean alignment `sign(Δ_ref)·Δ_model`, and sign-agreement rate `sign(Δ_model) = sign(Δ_ref)` | Patient-cluster bootstrap 95% CIs |
+| **`class_correspondence`** | Pearson *r* between the per-category mean Δ_ref and mean Δ_model | One-sided permutation test over category labels |
+| **`context_specificity`** | On cells with Δ_ref ≠ 0: mean of `sign(Δ_ref)·(Δ_model − Δ_shuffled)` | Patient-cluster bootstrap 95% CI; one-sided patient-cluster sign-flip test |
 
 A zero model delta counts as disagreement in the sign-agreement rate.
 
@@ -102,10 +104,10 @@ Confirmatory analyses are restricted to categories with at least `confirmatory_m
 
 | | Statistic | Uncertainty / test |
 |---|---|---|
-| **H1 – Directional alignment, per class** | Sign-agreement rate on cells with Δ_ref ≠ 0 | One-sided patient-cluster sign-flip test of rate > 0.5 (`cluster_p`); Benjamini–Hochberg across eligible classes; patient-cluster bootstrap CI. The exact binomial p-value (`binom_p`) is kept for reference only |
-| **H1 – Directional alignment, pooled** | Sign-agreement rate pooled over eligible classes | Permutation test that shuffles model deltas among the items of the same patient (tests item-level specificity within patients); patient-cluster bootstrap CI |
-| **H1 – Cross-class** | Mantel–Haenszel common odds ratio, stratified by class | Patient-cluster sign-flip test of pooled sign agreement > 0.5 on the same cells (`p_cluster`); the CMH p-value (`p_cmh`) is kept for reference only |
-| **H2 – Contextual alignment** | Per-class Brier improvement `Brier(context_free) − Brier(correct_context)` against correct-context labels | One-sided patient-cluster sign-flip test (`cluster_p`); Benjamini–Hochberg; patient-cluster bootstrap CI; macro summary. The Wilcoxon signed-rank p-value (`wilcoxon_p`) is kept for reference only |
+| **`directional_alignment`, per class** | Sign-agreement rate on cells with Δ_ref ≠ 0 | One-sided patient-cluster sign-flip test of rate > 0.5 (`cluster_p`); Benjamini–Hochberg across eligible classes; patient-cluster bootstrap CI. The exact binomial p-value (`binom_p`) is kept for reference only |
+| **`directional_alignment`, pooled** | Sign-agreement rate pooled over eligible classes | Permutation test that shuffles model deltas among the items of the same patient (tests item-level specificity within patients); patient-cluster bootstrap CI |
+| **`directional_alignment`, across classes** | Mantel–Haenszel common odds ratio, stratified by class | Patient-cluster sign-flip test of pooled sign agreement > 0.5 on the same cells (`p_cluster`); the CMH p-value (`p_cmh`) is kept for reference only |
+| **`brier_improvement`** | Per-class Brier improvement `Brier(context_free) − Brier(correct_context)` against correct-context labels | One-sided patient-cluster sign-flip test (`cluster_p`); Benjamini–Hochberg; patient-cluster bootstrap CI; macro summary. The Wilcoxon signed-rank p-value (`wilcoxon_p`) is kept for reference only |
 
 Secondary and descriptive outputs: Wasserstein distance to the label distribution, ICC(2,1) and Lin's CCC of the model against each observer compared with observer–observer agreement, expected calibration error, context-induced entropy change, repeated vs novel item strata, per-field context ablation, and fusion-architecture comparison.
 
@@ -113,7 +115,7 @@ Secondary and descriptive outputs: Wasserstein distance to the label distributio
 
 - **Bootstrap.** All confidence intervals are percentile intervals from a patient-cluster bootstrap (`shared/statistical/bootstrap.py`): whole patients are resampled with replacement, default 1,000 resamples. With fewer than two patients the CI is reported as NaN.
 - **Permutation tests.** Default 10,000 permutations. p-values are one-sided, in the direction of the hypothesis.
-- **Patient-cluster sign-flip test** (`shared/statistical/cluster_tests.py`). Used wherever a test compares cell-level values with zero (H4 in Track 3; the per-class H1, pooled CMH companion and H2 tests in Track 1). Under the null, each patient's summed contribution is symmetric about zero, so its sign is flipped as a block; the statistic is the mean over cells. When `2^(number of patients)` is at most the permutation count, all sign patterns are enumerated and the test is exact. **The smallest attainable p-value is then `2^−(number of patients)`**: 1/64 with six patients, 1/1024 with ten. This floor is the real limit of a design with that many patients, not an artifact of the test. Tests that treat cells as independent (`binom_p`, `p_cmh`, `wilcoxon_p`) are still written to the outputs for comparison but are not used for decisions.
+- **Patient-cluster sign-flip test** (`shared/statistical/cluster_tests.py`). Used wherever a test compares cell-level values with zero (`context_specificity` in Track 3; the per-class `directional_alignment`, its across-class CMH companion and `brier_improvement` in Track 1). Under the null, each patient's summed contribution is symmetric about zero, so its sign is flipped as a block; the statistic is the mean over cells. When `2^(number of patients)` is at most the permutation count, all sign patterns are enumerated and the test is exact. **The smallest attainable p-value is then `2^−(number of patients)`**: 1/64 with six patients, 1/1024 with ten. This floor is the real limit of a design with that many patients, not an artifact of the test. Tests that treat cells as independent (`binom_p`, `p_cmh`, `wilcoxon_p`) are still written to the outputs for comparison but are not used for decisions.
 - **Multiplicity.** Track 1 applies Benjamini–Hochberg (q = 0.05) across classes. Track 3 reports per-category results descriptively and does not correct them.
 - **Seeds.** Bootstrap, permutation, shuffled-context and generation seeds are set in config and recorded in the run manifest. `PYTHONHASHSEED` must be set before Python starts (see the README).
 
@@ -125,7 +127,7 @@ Most of the machinery in CAREBench exists because a simpler version gave a misle
 |---------|-----------|
 | Treating (patient, item) pairs as independent understates uncertainty, because pairs from one patient share context and observers | Patient-cluster bootstrap for every CI; patient-grouped cross-validation in Track 1 |
 | Training a model on the quantity you then test it on (for example, a loss that rewards matching the reference delta direction) makes the endpoint circular | Track 1's Stage 2 fits labels only; Track 3 involves no training |
-| Mistaking any response to extra text for a response to *this patient's* context | Shuffled-context control and H4 |
+| Mistaking any response to extra text for a response to *this patient's* context | Shuffled-context control and `context_specificity` |
 | The item's own text appearing in the context snapshot, so the "context" effect is really the item being repeated | `LabelLeakageError`: a context build fails if the item text appears in any context field, unless the check is explicitly disabled |
 | Text-standardization rules learned from evaluation items leak information into training | Fuzzy item matching is built from training items only (`build_fuzzy_matcher_from_train`) |
 | An item string seen during training (under a different patient) is easier than a novel one | Track 1 reports results separately for repeated and novel items |
@@ -142,7 +144,7 @@ Results are claims about **the patients and reference observers in the evaluated
 
 These are known gaps between the intended design and the current code.
 
-- **Track 3's H1 and H2 have intervals but no reference point.** Mean \|Δ_model\| is above zero for almost any model that reads the context at all, and the chance level of the sign-agreement rate is not 0.5 when zero deltas count as disagreement. The shuffled-context condition provides the natural reference for both. ([#17](https://github.com/soroushdty/CAREBench/issues/17))
-- **H3 is a correlation over the number of categories** (ten by default), so it has little power and is best read descriptively.
+- **Track 3's `context_sensitivity` and `directional_alignment` have intervals but no reference point.** Mean \|Δ_model\| is above zero for almost any model that reads the context at all, and the chance level of the sign-agreement rate is not 0.5 when zero deltas count as disagreement. The shuffled-context condition provides the natural reference for both. ([#17](https://github.com/soroushdty/CAREBench/issues/17))
+- **`class_correspondence` is a correlation over the number of categories** (ten by default), so it has little power and is best read descriptively.
 - **No simulation-based validation yet.** The false-positive rate and power of the endpoints under known effects have not been measured. ([#18](https://github.com/soroushdty/CAREBench/issues/18))
 - **One label taxonomy** ([#5](https://github.com/soroushdty/CAREBench/issues/5)) and **one dataset format** ([#6](https://github.com/soroushdty/CAREBench/issues/6)) so far.

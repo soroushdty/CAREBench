@@ -77,36 +77,36 @@ def make_hypothesis_summary(
 
         h3_model = h3_c[h3_c["model"] == model] if not h3_c.empty and "model" in h3_c.columns else pd.DataFrame()
 
-        H1_mean_abs_delta_correct = _agg(h1_c, "mean_abs_delta_correct")
-        H1_mean_abs_delta_shuffled = _agg(h1_c, "mean_abs_delta_shuffled")
-        H1_proportion_changed_correct = _agg(h1_c, "proportion_changed_correct")
-        H1_proportion_changed_shuffled = _agg(h1_c, "proportion_changed_shuffled")
+        context_sensitivity_mean_abs_delta_correct = _agg(h1_c, "mean_abs_delta_correct")
+        context_sensitivity_mean_abs_delta_shuffled = _agg(h1_c, "mean_abs_delta_shuffled")
+        context_sensitivity_proportion_changed_correct = _agg(h1_c, "proportion_changed_correct")
+        context_sensitivity_proportion_changed_shuffled = _agg(h1_c, "proportion_changed_shuffled")
 
-        H2_mean_alignment_correct = _agg(h2_c, "mean_alignment_correct")
-        H2_mean_alignment_shuffled = _agg(h2_c, "mean_alignment_shuffled")
-        H2_sign_agreement_correct = _agg(h2_c, "sign_agreement_correct")
-        H2_sign_agreement_shuffled = _agg(h2_c, "sign_agreement_shuffled")
+        directional_alignment_mean_alignment_correct = _agg(h2_c, "mean_alignment_correct")
+        directional_alignment_mean_alignment_shuffled = _agg(h2_c, "mean_alignment_shuffled")
+        directional_alignment_sign_agreement_correct = _agg(h2_c, "sign_agreement_correct")
+        directional_alignment_sign_agreement_shuffled = _agg(h2_c, "sign_agreement_shuffled")
 
         def _h3val(col):
             if h3_model.empty or col not in h3_model.columns:
                 return float("nan")
             return float(h3_model.iloc[0][col])
 
-        H3_pearson_correct = _h3val("pearson_correct")
-        H3_spearman_correct = _h3val("spearman_correct")
-        H3_pearson_shuffled = _h3val("pearson_shuffled")
-        H3_spearman_shuffled = _h3val("spearman_shuffled")
+        class_correspondence_pearson_correct = _h3val("pearson_correct")
+        class_correspondence_spearman_correct = _h3val("spearman_correct")
+        class_correspondence_pearson_shuffled = _h3val("pearson_shuffled")
+        class_correspondence_spearman_shuffled = _h3val("spearman_shuffled")
 
-        H4_mean_alignment_difference = _agg(h4_c, "mean_alignment_difference")
-        H4_ci_low = _agg(h4_c, "ci_low_difference")
-        H4_ci_high = _agg(h4_c, "ci_high_difference")
-        H4_p_value = _agg(h4_c, "paired_permutation_p")
+        context_specificity_mean_alignment_difference = _agg(h4_c, "mean_alignment_difference")
+        context_specificity_ci_low = _agg(h4_c, "ci_low_difference")
+        context_specificity_ci_high = _agg(h4_c, "ci_high_difference")
+        context_specificity_p_value = _agg(h4_c, "paired_permutation_p")
 
         # Interpretation flag
         interpretation_flag = _assign_flag(
-            H1_mean_abs_delta_correct,
-            H4_ci_low,
-            H4_mean_alignment_difference,
+            context_sensitivity_mean_abs_delta_correct,
+            context_specificity_ci_low,
+            context_specificity_mean_alignment_difference,
             epsilon,
         )
 
@@ -117,22 +117,22 @@ def make_hypothesis_summary(
                 "n_patient_items": n_patient_items,
                 "n_cells": n_cells,
                 "n_physician_shift_cells": n_shift,
-                "H1_mean_abs_delta_correct": H1_mean_abs_delta_correct,
-                "H1_mean_abs_delta_shuffled": H1_mean_abs_delta_shuffled,
-                "H1_proportion_changed_correct": H1_proportion_changed_correct,
-                "H1_proportion_changed_shuffled": H1_proportion_changed_shuffled,
-                "H2_mean_alignment_correct": H2_mean_alignment_correct,
-                "H2_mean_alignment_shuffled": H2_mean_alignment_shuffled,
-                "H2_sign_agreement_correct": H2_sign_agreement_correct,
-                "H2_sign_agreement_shuffled": H2_sign_agreement_shuffled,
-                "H3_pearson_correct": H3_pearson_correct,
-                "H3_spearman_correct": H3_spearman_correct,
-                "H3_pearson_shuffled": H3_pearson_shuffled,
-                "H3_spearman_shuffled": H3_spearman_shuffled,
-                "H4_mean_alignment_difference": H4_mean_alignment_difference,
-                "H4_ci_low": H4_ci_low,
-                "H4_ci_high": H4_ci_high,
-                "H4_p_value": H4_p_value,
+                "context_sensitivity_mean_abs_delta_correct": context_sensitivity_mean_abs_delta_correct,
+                "context_sensitivity_mean_abs_delta_shuffled": context_sensitivity_mean_abs_delta_shuffled,
+                "context_sensitivity_proportion_changed_correct": context_sensitivity_proportion_changed_correct,
+                "context_sensitivity_proportion_changed_shuffled": context_sensitivity_proportion_changed_shuffled,
+                "directional_alignment_mean_alignment_correct": directional_alignment_mean_alignment_correct,
+                "directional_alignment_mean_alignment_shuffled": directional_alignment_mean_alignment_shuffled,
+                "directional_alignment_sign_agreement_correct": directional_alignment_sign_agreement_correct,
+                "directional_alignment_sign_agreement_shuffled": directional_alignment_sign_agreement_shuffled,
+                "class_correspondence_pearson_correct": class_correspondence_pearson_correct,
+                "class_correspondence_spearman_correct": class_correspondence_spearman_correct,
+                "class_correspondence_pearson_shuffled": class_correspondence_pearson_shuffled,
+                "class_correspondence_spearman_shuffled": class_correspondence_spearman_shuffled,
+                "context_specificity_mean_alignment_difference": context_specificity_mean_alignment_difference,
+                "context_specificity_ci_low": context_specificity_ci_low,
+                "context_specificity_ci_high": context_specificity_ci_high,
+                "context_specificity_p_value": context_specificity_p_value,
                 "failure_rate": failure_rate,
                 "interpretation_flag": interpretation_flag,
             }
@@ -147,7 +147,7 @@ def _assign_flag(
     h4_mean_diff: float,
     epsilon: float,
 ) -> str:
-    """Assign interpretation flag based on H1 and H4 results."""
+    """Assign interpretation flag from context sensitivity and context specificity."""
     def _is_nan(v: float) -> bool:
         try:
             return float(v) != float(v)  # NaN check
@@ -170,7 +170,7 @@ def _assign_flag(
 def make_model_comparison_summary(
     hypothesis_summary: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Create model comparison summary sorted by H4 alignment difference.
+    """Create model comparison summary sorted by context specificity (alignment difference).
 
     Parameters
     ----------
@@ -180,27 +180,27 @@ def make_model_comparison_summary(
     Returns
     -------
     pd.DataFrame
-        Models ranked by H4_mean_alignment_difference descending.
+        Models ranked by context_specificity_mean_alignment_difference descending.
     """
     cols = [
         "model",
-        "H1_mean_abs_delta_correct",
-        "H1_mean_abs_delta_shuffled",
-        "H2_mean_alignment_correct",
-        "H2_mean_alignment_shuffled",
-        "H3_pearson_correct",
-        "H3_spearman_correct",
-        "H4_mean_alignment_difference",
-        "H4_ci_low",
-        "H4_ci_high",
-        "H4_p_value",
+        "context_sensitivity_mean_abs_delta_correct",
+        "context_sensitivity_mean_abs_delta_shuffled",
+        "directional_alignment_mean_alignment_correct",
+        "directional_alignment_mean_alignment_shuffled",
+        "class_correspondence_pearson_correct",
+        "class_correspondence_spearman_correct",
+        "context_specificity_mean_alignment_difference",
+        "context_specificity_ci_low",
+        "context_specificity_ci_high",
+        "context_specificity_p_value",
         "failure_rate",
         "interpretation_flag",
     ]
     available = [c for c in cols if c in hypothesis_summary.columns]
     df = hypothesis_summary[available].copy()
 
-    sort_col = "H4_mean_alignment_difference"
+    sort_col = "context_specificity_mean_alignment_difference"
     if sort_col in df.columns:
         df = df.sort_values(sort_col, ascending=False, na_position="last")
 

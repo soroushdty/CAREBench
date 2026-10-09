@@ -38,8 +38,8 @@ Dependencies point one way: `tracks/` and `adapters/` import from `shared/`; `sh
 | 2 – Adaptation | Learning from supervised case experience (clinical training, feedback on real cases) | Can the shift be learned from labelled cases and carried over to new patients? | Planned ([#13](https://github.com/soroushdty/CAREBench/issues/13)) |
 | 3 – Reasoning | Deliberating over the chart at decision time, without changing what the model knows | Does the shift come from reasoning at decision time? | Available |
 
-- **[Track 1 — Representation](tracks/representation/README.md)** (`tracks/representation/`): Bio-ClinicalBERT embedding pipeline, multilabel classifier, context-aware fusion head, LOPO-CV, and statistical hypothesis analysis (H1–H2).
-- **[Track 3 — Reasoning](tracks/reasoning/README.md)** (`tracks/reasoning/`): LLM context-shift assay pipeline. Runs each EHR item under three conditions (context-free, correct-context, shuffled-context) and tests H1–H4 against physician judgment shifts.
+- **[Track 1 — Representation](tracks/representation/README.md)** (`tracks/representation/`): Bio-ClinicalBERT embedding pipeline, multilabel classifier, context-aware fusion head, LOPO-CV, and statistical analysis of the `directional_alignment` and `brier_improvement` endpoints.
+- **[Track 3 — Reasoning](tracks/reasoning/README.md)** (`tracks/reasoning/`): LLM context-shift assay pipeline. Runs each EHR item under three conditions (context-free, correct-context, shuffled-context) and computes the four Track 3 endpoints against physician judgment shifts.
 
 ### Shared Layer
 
@@ -53,16 +53,17 @@ CAREBench implements an **LLM context-shift assay**. Human reference observers (
 
 The central question is: **Does a model change its privacy-category judgment when patient context is added, and do those changes match the human judgment shifts?**
 
-The primary endpoints are:
+The endpoints have the same names in every track (`shared/endpoints.py`; statistics and tests per track are in [`docs/methodology.md`](docs/methodology.md#endpoints)):
 
-- **H1 — Context Sensitivity**: Does the LLM's mean absolute delta (correct-context minus context-free) exceed zero?
-- **H2 — Directional Physician Alignment**: Do LLM context-induced deltas agree in sign with physician judgment deltas?
-- **H3 — Class-Level Correspondence**: Do class-level mean LLM deltas correlate with class-level mean physician deltas across the privacy categories?
-- **H4 — Correct vs Shuffled Context Control**: Does correct patient context produce stronger alignment with physician deltas than shuffled (wrong-patient) context?
+- **`context_sensitivity`**: Does the model's mean absolute delta (correct-context minus context-free) exceed zero? *(Track 3; formerly H1)*
+- **`directional_alignment`**: Do the model's context-induced deltas agree in sign with the physicians' judgment deltas? *(Track 3, formerly H2; Track 1, formerly H1)*
+- **`class_correspondence`**: Do class-level mean model deltas correlate with class-level mean physician deltas across the categories? *(Track 3; formerly H3)*
+- **`context_specificity`**: Does the correct patient's context produce stronger alignment with the physician deltas than a shuffled (wrong-patient) context? *(Track 3; formerly H4)*
+- **`brier_improvement`**: Does context lower the Brier score against the correct-context reference labels? *(Track 1; formerly H2)*
 
 The default label space is the ten sensitive-data categories used in the SHARES project: behavioral_health, diagnoses, disabilities, infectious_diseases, genetics, medications, sexual_reproductive_health, social_determinants_of_health, violence, other. Other taxonomies are set in config (`classes` and `class_definitions`; see [`docs/adapters.md`](docs/adapters.md#label-space-sharedlabel_spacepy)).
 
-**Scope**: Claims are scoped to the patients and reference observers of the dataset being evaluated. The endpoints measure context-induced shifts and their agreement with the reference shifts, not classification accuracy. The one exception is Track 1's H2, which tests whether context lowers the Brier score against the correct-context reference labels.
+**Scope**: Claims are scoped to the patients and reference observers of the dataset being evaluated. The endpoints measure context-induced shifts and their agreement with the reference shifts, not classification accuracy. The one exception is Track 1's `brier_improvement`, which tests whether context lowers the Brier score against the correct-context reference labels.
 
 Formal definitions of every endpoint, the unit of analysis, the statistical tests, and the design decisions behind them are in [`docs/methodology.md`](docs/methodology.md).
 
@@ -94,7 +95,7 @@ The assay runs each EHR item through a Hugging Face LLM under three conditions:
 2. **Correct-context**: Item text plus the correct patient's clinical snapshot.
 3. **Shuffled-context**: Item text plus a randomly selected different patient's clinical snapshot (control).
 
-For each condition the LLM outputs a JSON object with probability scores for all ten privacy categories. The assay then computes physician and LLM judgment deltas and tests H1–H4.
+For each condition the LLM outputs a JSON object with probability scores for all ten privacy categories. The assay then computes physician and LLM judgment deltas and the four Track 3 endpoints.
 
 Canonical entry point: `tracks/reasoning/run_assay.py`. See [`tracks/reasoning/README.md`](tracks/reasoning/README.md) for full details.
 
@@ -189,7 +190,7 @@ For Google Colab, Jupyter, or HPC: open `main_notebook.ipynb`.
 | **Context Building**     | Builds correct-context and shuffled-context patient snapshots with label leakage prevention                                                     |
 | **LLM Prompting**        | Runs each item under three conditions (context-free, correct-context, shuffled-context) through a Hugging Face LLM                              |
 | **Score Parsing**        | Validates LLM JSON outputs against the privacy-category schema and exports per-condition score CSVs                                             |
-| **Hypothesis Analysis**  | Computes H1–H4 endpoints with patient-cluster bootstrap CIs and permutation tests                                                               |
+| **Hypothesis Analysis**  | Computes the four Track 3 endpoints with patient-cluster bootstrap CIs and permutation tests                                                    |
 | **Report Generation**    | Produces a markdown analysis report with all results, per-category breakdowns, and a limitations section                                        |
 
 ## Configuration
@@ -229,7 +230,7 @@ Planned work is tracked in [GitHub issues](https://github.com/soroushdty/CAREBen
 - **Multi-agent reference emulation**: blind LLM rater pairs with consensus and adjudication, mirroring the paired-physician reference design (aligned with the EviTrace multi-agent roadmap).
 - **Track 2 — Adaptation** ([#13](https://github.com/soroushdty/CAREBench/issues/13)): the analogue of a physician learning from supervised case experience. A model is fine-tuned on labelled (patient context, item) cases from training patients, then evaluated on new patients under the same three conditions as Track 3. A learning curve shows how alignment with physicians grows with the number of patients learned from.
 - **Patient-grouped cross-validation** ([#10](https://github.com/soroushdty/CAREBench/issues/10)): shared, configurable splits (leave-one-patient-out or grouped k-fold) for Tracks 1 and 2.
-- **Shuffled-context condition for Track 1** ([#11](https://github.com/soroushdty/CAREBench/issues/11)): a wrong-patient context control, so Track 1 can test whether the model uses *this* patient's context, as Track 3's H4 does.
+- **Shuffled-context condition for Track 1** ([#11](https://github.com/soroushdty/CAREBench/issues/11)): a wrong-patient context control, so Track 1 can test whether the model uses *this* patient's context, as Track 3's `context_specificity` does.
 - **Same-model comparison across tracks** ([#12](https://github.com/soroushdty/CAREBench/issues/12)): one model family run frozen, fine-tuned, and prompted, so differences between tracks reflect the mechanism rather than the model.
 - **Distribution-shift evaluation**: requires a second dataset in the paired-context format.
 - **Other inputs and backends**: FHIR/OMOP ingestion, confidence-weighted or adjudicated reference aggregation, and hosted-API LLM backends.
@@ -264,9 +265,9 @@ CAREBench/
 │   │   ├── strategies/        # Injectable training strategies
 │   │   ├── training/          # Ensemble pipeline, calibration, CV, threshold tuning
 │   │   ├── models/            # EnsemblePredictor, MultiLabelModel, ModelRegistry
-│   │   └── statistical/       # H1–H2 hypotheses, run_analysis orchestrator, reporting
+│   │   └── statistical/       # Endpoint tests, run_analysis orchestrator, reporting
 │   └── reasoning/             # Track 3: LLM assay pipeline
-│       └── bundle/            # Post-hoc analysis bundle (deltas, H1–H4, report)
+│       └── bundle/            # Post-hoc analysis bundle (deltas, endpoints, report)
 ├── adapters/                  # Dataset adapters
 │   └── paired_context/        # Paired-context adapter (column maps, labels, Track 1 and Track 3 adapters)
 ├── configs/                   # All YAML configuration files

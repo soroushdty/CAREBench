@@ -3,7 +3,8 @@
 Analyze LLM context effects and generate a full analysis bundle.
 
 Consumes pre-generated LLM score CSVs and physician consensus data, then
-produces paired cell deltas, H1–H4 statistical results, a Markdown report,
+produces paired cell deltas, the four Track 3 endpoint results
+(shared/endpoints.py), a Markdown report,
 and a ZIP bundle.
 
 Usage (assay scores directory — auto-discovers all model subdirectories):
@@ -268,11 +269,11 @@ def _check_output_collision(output_dir: str, overwrite: bool) -> None:
     expected = [
         "paired_cell_deltas.csv",
         "hypothesis_summary.csv",
-        "H1_context_sensitivity.csv",
-        "H2_directional_alignment.csv",
-        "H3_class_level_effects.csv",
-        "H3_class_level_correlations.csv",
-        "H4_correct_vs_shuffled_context.csv",
+        "context_sensitivity.csv",
+        "directional_alignment.csv",
+        "class_correspondence_effects.csv",
+        "class_correspondence.csv",
+        "context_specificity.csv",
         "model_comparison_summary.csv",
         "validation_summary.csv",
         "LLM_CONTEXT_SHIFT_REPORT.md",
@@ -415,11 +416,11 @@ def main(argv: list[str] | None = None) -> None:
     h3_corr_df = pd.concat(all_h3_corr, ignore_index=True)
     h4_df = pd.concat(all_h4, ignore_index=True)
 
-    _save(h1_df, out("H1_context_sensitivity.csv"))
-    _save(h2_df, out("H2_directional_alignment.csv"))
-    _save(h3_effects_df, out("H3_class_level_effects.csv"))
-    _save(h3_corr_df, out("H3_class_level_correlations.csv"))
-    _save(h4_df, out("H4_correct_vs_shuffled_context.csv"))
+    _save(h1_df, out("context_sensitivity.csv"))
+    _save(h2_df, out("directional_alignment.csv"))
+    _save(h3_effects_df, out("class_correspondence_effects.csv"))
+    _save(h3_corr_df, out("class_correspondence.csv"))
+    _save(h4_df, out("context_specificity.csv"))
 
     # ------------------------------------------------------------------
     # Step 6: Summaries
@@ -476,11 +477,11 @@ def main(argv: list[str] | None = None) -> None:
         "paired_cell_deltas.csv",
         "validation_summary.csv",
         "failed_or_missing_rows.csv",
-        "H1_context_sensitivity.csv",
-        "H2_directional_alignment.csv",
-        "H3_class_level_effects.csv",
-        "H3_class_level_correlations.csv",
-        "H4_correct_vs_shuffled_context.csv",
+        "context_sensitivity.csv",
+        "directional_alignment.csv",
+        "class_correspondence_effects.csv",
+        "class_correspondence.csv",
+        "context_specificity.csv",
         "hypothesis_summary.csv",
         "model_comparison_summary.csv",
         "LLM_CONTEXT_SHIFT_REPORT.md",

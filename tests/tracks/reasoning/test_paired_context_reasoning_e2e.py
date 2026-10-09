@@ -4,7 +4,7 @@ End-to-end test for paired-context reasoning dry-run.
 Validates that the repaired reasoning pipeline:
 1. Exits with code 0 on dry-run
 2. Produces score CSVs with canonical-key columns
-3. Executes H1-H4 analysis (not skipped due to all-NaN)
+3. Computes all four endpoints (not skipped due to all-NaN)
 4. Includes dry-run/mock metadata in the report
 
 This test uses the synthetic example dataset (examples/synthetic/dataset.xlsx) and the dry_run backend
@@ -130,7 +130,7 @@ class TestScoreCSVs:
 
 
 class TestHypothesisExecution:
-    """Verify H1-H4 analysis executes (not skipped)."""
+    """Verify the endpoint analysis executes (not skipped)."""
 
     def _find_report(self, output_dir: Path) -> Path | None:
         """Find the analysis report markdown."""
@@ -143,7 +143,7 @@ class TestHypothesisExecution:
         assert report is not None, "analysis_report.md not found in output"
 
     def test_h1_h4_not_skipped(self, dry_run_output) -> None:
-        """H1-H4 analysis executes (not skipped due to all-NaN score arrays)."""
+        """All four endpoints are computed (not skipped due to all-NaN score arrays)."""
         report = self._find_report(dry_run_output["output_dir"])
         if report is None:
             pytest.fail("Report not found")
@@ -151,22 +151,22 @@ class TestHypothesisExecution:
         content = report.read_text()
 
         # H1 should have a numeric result (the section exists with data)
-        assert "### H1" in content
+        assert "### Context sensitivity (formerly H1)" in content
         # The aggregate mean absolute delta line should exist (even if 0.0000)
         assert "Aggregate mean absolute delta:**" in content
 
         # H2 should have sign agreement rate section
-        assert "### H2" in content
+        assert "### Directional alignment (formerly H2)" in content
         assert "Sign agreement rate:**" in content
 
         # H3 should have Pearson r section (may be NaN for constant mock data,
         # which is a valid statistical result — not a pipeline skip)
-        assert "### H3" in content
+        assert "### Class-level correspondence (formerly H3)" in content
         assert "Pearson r:**" in content
 
         # H4 should either have results or explicit skip reason (not missing)
-        assert "### H4" in content
-        h4_section_start = content.index("### H4")
+        assert "### Context specificity (formerly H4)" in content
+        h4_section_start = content.index("### Context specificity")
         h4_section = content[h4_section_start:h4_section_start + 500]
         has_result = "Mean alignment difference" in h4_section
         has_skip = "Skipped" in h4_section
@@ -176,8 +176,8 @@ class TestHypothesisExecution:
 
         # Critical check: the pipeline did NOT skip due to all-NaN arrays.
         # This would manifest as the absence of hypothesis sections entirely
-        # or the log message "Skipping hypothesis analysis".
-        assert "Skipping hypothesis analysis" not in content
+        # or the log message "Skipping endpoint analysis".
+        assert "Skipping endpoint analysis" not in content
 
 
 class TestDryRunMetadata:

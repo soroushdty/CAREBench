@@ -94,7 +94,7 @@ figure1_delta_histogram(
 distribution of physician delta values across all items. Bars are color-coded by delta
 magnitude: dark red (−1.0), orange (−0.5), blue-gray (0.0), green (+0.5), dark green
 (+1.0). Each panel is annotated with `n_nz` (the count of non-zero deltas), which is the
-effective sample size for H1 per-class tests.
+effective sample size for the per-class directional-alignment tests.
 
 **Saved to:** `figures/figure1_delta_histogram.png`
 

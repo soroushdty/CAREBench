@@ -94,47 +94,47 @@ strings with a warning if the mapping file is unavailable or the build fails.
 
 Calls `shared.statistical.icc.load_individual_physician_labels()`. Used in Steps 9 and 14.
 
-### Step 4 — H1 per-class sign-agreement test
+### Step 4 — Directional alignment per class (formerly H1)
 
 Calls `tracks.representation.statistical.hypotheses.h1.h1_binomial_per_class`. The confirmatory p-value (`cluster_p`) is a
 patient-cluster sign-flip test of sign agreement > 0.5; the exact binomial p-value (`binom_p`) treats cells as independent
 and is kept for reference only. BH FDR correction is applied to `cluster_p` across confirmatory-eligible classes; all
 classes are reported with their `confirmatory` flag.
 
-**Output:** `h1_per_class.csv`
+**Output:** `directional_alignment_per_class.csv`
 
-### Step 5 — H1 aggregate permutation test
+### Step 5 — Directional alignment pooled (permutation test)
 
 Calls `tracks.representation.statistical.hypotheses.h1.h1_permutation_test` with `n_permutations = 10_000` (configurable
 via `statistical_analysis.n_permutations`). Patient rows of `delta_m` are shuffled within
 each patient block, pooled across confirmatory-eligible classes.
 
-**Output:** `h1_aggregate.json`
+**Output:** `directional_alignment_pooled.json`
 
-### Step 6 — H1 CMH pooled cross-class
+### Step 6 — Directional alignment across classes (CMH)
 
 Calls `tracks.representation.statistical.hypotheses.h1.h1_cmh_test`. Builds one 2×2 table per confirmatory-eligible class
 (stratified by physician-delta direction) and combines them via the Mantel-Haenszel
 common-odds-ratio statistic. `p_cluster` is a patient-cluster sign-flip test of pooled sign agreement > 0.5 on the same
 cells; `p_cmh` treats cells as independent and is kept for reference only.
 
-**Output:** `h1_cmh.json`
+**Output:** `directional_alignment_cmh.json`
 
-### Step 7 — H2 Wilcoxon Brier and macro summary
+### Step 7 — Brier improvement per class and macro summary (formerly H2)
 
 Calls `tracks.representation.statistical.hypotheses.h2.h2_wilcoxon_per_class` then `h2_macro_summary`. The confirmatory
 p-value (`cluster_p`) is a one-sided patient-cluster sign-flip test of whether context-aware Brier scores are lower; the
 Wilcoxon signed-rank p-value (`wilcoxon_p`) treats items as independent and is kept for reference only. BH FDR
 correction is applied to `cluster_p` across all classes.
 
-**Outputs:** `h2_brier.csv`, `h2_brier_summary.json`
+**Outputs:** `brier_improvement_per_class.csv`, `brier_improvement_summary.json`
 
-### Step 8 — H2 Wasserstein distance
+### Step 8 — Wasserstein distance (descriptive)
 
 Calls `tracks.representation.statistical.hypotheses.h2.h2_wasserstein_per_class`. Secondary/sensitivity measure; no FDR
 correction applied.
 
-**Output:** `h2_wasserstein.csv`
+**Output:** `wasserstein_distance.csv`
 
 ### Step 9 — ICC rater-level analysis
 
@@ -200,15 +200,15 @@ failure does not abort the pipeline.
 
 ## Output manifest
 
-| File                    | Content                                       |
-| ----------------------- | --------------------------------------------- |
-| `tau_robustness.csv`    | τ=0.5 vs F1-optimal per-class                 |
-| `h1_per_class.csv`      | H1 sign agreement, BH-adjusted p              |
-| `h1_aggregate.json`     | H1 permutation test result                    |
-| `h1_cmh.json`           | H1 CMH common odds ratio                      |
-| `h2_brier.csv`          | H2 Brier improvement per class                |
-| `h2_brier_summary.json` | H2 macro-average Brier summary                |
-| `h2_wasserstein.csv`    | H2 Wasserstein-1 distance per class           |
+| File | Content |
+| --- | --- |
+| `tau_robustness.csv` | τ=0.5 vs F1-optimal per-class |
+| `directional_alignment_per_class.csv` | Directional alignment (formerly H1): sign agreement per class, BH-adjusted p |
+| `directional_alignment_pooled.json` | Directional alignment pooled over classes: permutation test |
+| `directional_alignment_cmh.json` | Directional alignment across classes: CMH common odds ratio and cluster p |
+| `brier_improvement_per_class.csv` | Brier improvement (formerly H2) per class |
+| `brier_improvement_summary.json` | Brier improvement macro-average summary |
+| `wasserstein_distance.csv` | Wasserstein-1 distance per class (descriptive) |
 | `icc_results.csv`       | Per-pair ICC(2,1) and CCC values              |
 | `icc_summary.json`      | ICC aggregate means and bootstrap CIs         |
 | `calibration_ece.csv`   | ECE per class with >0.10 flag                 |

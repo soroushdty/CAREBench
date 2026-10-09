@@ -179,6 +179,16 @@ class TestBackendSelection:
     ):
         embedding(_TEXTS, decoder_dir, cfg=_cfg(embedding_backend="auto"))
 
+    def test_auto_with_non_mean_pooling_warns_that_results_changed(self, decoder_dir, caplog):
+        with caplog.at_level(logging.WARNING, logger="shared.embeddings.compute_embeddings"):
+            embedding(_TEXTS, decoder_dir, cfg=_cfg(embedding_backend="auto"))
+        assert "differ from runs of the same config with earlier versions" in caplog.text
+
+    def test_explicit_transformers_backend_does_not_warn(self, decoder_dir, caplog):
+        with caplog.at_level(logging.WARNING, logger="shared.embeddings.compute_embeddings"):
+            embedding(_TEXTS, decoder_dir, cfg=_cfg())
+        assert "earlier versions" not in caplog.text
+
     def test_auto_with_mean_pooling_tries_sentence_transformers_first(self, decoder_dir, monkeypatch):
         import sentence_transformers
 

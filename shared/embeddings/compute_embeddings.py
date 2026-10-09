@@ -229,6 +229,15 @@ def embedding(
             "Loading %s with transformers AutoModel (embedding_backend=%s, pooling=%s).",
             model_id, backend, pooling,
         )
+        if backend == "auto":
+            # Before #29, auto loaded a SentenceTransformer whatever the pooling,
+            # so it silently applied mean pooling.
+            logger.warning(
+                "pooling=%r now applies with embedding_backend 'auto'. Before LM-ContextProbe "
+                "0.2.0, 'auto' ignored pooling and used mean pooling, so these embeddings "
+                "differ from runs of the same config with earlier versions.",
+                pooling,
+            )
     else:
         try:
             logger.info("Loading %s as SentenceTransformer...", model_id)

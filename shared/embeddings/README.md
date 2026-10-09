@@ -25,7 +25,7 @@ Track 1 takes its model from `llm` in `configs/main_config.yaml`. Both encoders 
 
 ### Backends
 
-- **`auto`**: with `pooling: mean`, loads the model as a SentenceTransformer, and if that fails falls back to `transformers`. With any other pooling, uses `transformers` directly. The default; this is how Bio_ClinicalBERT has always been embedded.
+- **`auto`**: with `pooling: mean`, loads the model as a SentenceTransformer, and if that fails falls back to `transformers`. With any other pooling, uses `transformers` directly. The default; this is how Bio_ClinicalBERT has always been embedded. Before 0.2.0, `auto` loaded a SentenceTransformer whatever the pooling, so a non-mean `pooling` was silently replaced by mean pooling; such configs now give different embeddings, and the run logs a warning saying so.
 - **`transformers`**: loads `AutoModel` and applies `pooling` to the last hidden state. Use this for decoder models. Its `mean` pooling leaves out `[SEP]`, while SentenceTransformer's includes it, so switching an encoder from `auto` to `transformers` changes its embeddings (for Bio_ClinicalBERT, cosine similarity about 0.94 on short items).
 - **`sentence_transformers`**: SentenceTransformer only, no fallback. The model's own pooling configuration applies, so `pooling` must be `mean`.
 

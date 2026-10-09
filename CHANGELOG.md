@@ -6,7 +6,7 @@ The first archived release (Zenodo DOI). Endpoints and tests are **protocol v1**
 
 - **Decoder LLMs as the Track 1 representation model** (#29). The embedding code assumed a BERT-style encoder. A decoder model (for example the family Track 3 prompts) now works as `llm`, see `shared/embeddings/README.md`:
   - `pooling: last_token` takes the last non-padding token, the only one that has seen the whole input under causal attention. `pooling: none` (first token) on a decoder logs a warning.
-  - `embedding_backend` (`auto`, `transformers`, `sentence_transformers`). `auto`, the default, keeps the old behaviour for `pooling: mean`. For any other pooling it now goes straight to `transformers`, because the SentenceTransformer path used to ignore `pooling` and silently apply mean pooling.
+  - `embedding_backend` (`auto`, `transformers`, `sentence_transformers`). `auto`, the default, keeps the old behaviour for `pooling: mean`. For any other pooling it now goes straight to `transformers`, because the SentenceTransformer path used to ignore `pooling` and silently apply mean pooling. **A config with `pooling` other than `mean` and the default backend now gives different embeddings than before**, and the run logs a warning saying so.
   - When the tokenizer has no padding token, it pads with EOS, on the right, so a text's vector doesn't depend on its batch.
   - `embedding_dtype` (`float32`/`float16`/`bfloat16`) and `embedding_device_map` load large models in half precision and across devices.
   - The architecture comparison's `param_count` uses the actual vector width instead of assuming d = 768, and the 4-vector count is corrected (it said 30,720 per class at d = 768; it is 3,072).

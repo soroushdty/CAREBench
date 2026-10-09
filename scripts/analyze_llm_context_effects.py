@@ -58,6 +58,7 @@ import yaml
 
 from shared.label_space import DEFAULT_LABEL_SPACE, LabelSpace
 from tracks.reasoning.bundle.loader import load_llm_scores, load_physician_consensus
+from tracks.reasoning.prompt_template import DEFAULT_CATEGORY_TYPE
 from tracks.reasoning.bundle.validator import validate_inputs
 from tracks.reasoning.bundle.delta_builder import build_paired_cell_deltas
 from tracks.reasoning.bundle.hypotheses import compute_h1, compute_h2, compute_h3, compute_h4
@@ -138,23 +139,33 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--config", default=None,
         help=(
             "Assay config whose data.classes and data.class_definitions define the "
-            "categories (default: the ten SHARES categories)"
+            "categories, and whose prompt.category_type sets the report wording "
+            "(default: the ten SHARES privacy categories)"
         ),
     )
 
     return parser.parse_args(argv)
 
 
-def _load_label_space(config_path: str | None) -> tuple[LabelSpace, dict | None]:
-    """Label space and class_definitions from an assay config, or the default."""
+def _load_label_space(config_path: str | None) -> tuple[LabelSpace, dict | None, str]:
+    """Label space, class_definitions and category type from an assay config.
+
+    Without a config: the ten SHARES categories and ``"privacy"``.
+    """
     if config_path is None:
-        return DEFAULT_LABEL_SPACE, None
+        return DEFAULT_LABEL_SPACE, None, DEFAULT_CATEGORY_TYPE
     with open(config_path, encoding="utf-8") as fh:
-        data_cfg = (yaml.safe_load(fh) or {}).get("data") or {}
+        cfg = yaml.safe_load(fh) or {}
+    data_cfg = cfg.get("data") or {}
     if "classes" not in data_cfg:
         raise SystemExit(f"{config_path}: no data.classes entry")
     definitions = data_cfg.get("class_definitions")
-    return LabelSpace.from_config(data_cfg["classes"], definitions), definitions
+    category_type = (cfg.get("prompt") or {}).get("category_type", DEFAULT_CATEGORY_TYPE)
+    return (
+        LabelSpace.from_config(data_cfg["classes"], definitions),
+        definitions,
+        category_type,
+    )
 
 
 _CONDITION_FILES = {
@@ -293,7 +304,7 @@ def main(argv: list[str] | None = None) -> None:
 
     out = lambda name: os.path.join(args.output_dir, name)
 
-    label_space, class_definitions = _load_label_space(args.config)
+    label_space, class_definitions, category_type = _load_label_space(args.config)
     categories = label_space.keys()
     run_params = {
         "seed": args.seed,
@@ -439,6 +450,7 @@ def main(argv: list[str] | None = None) -> None:
         output_path=report_path,
         run_params=run_params,
         categories=categories,
+        category_type=category_type,
     )
 
     # ------------------------------------------------------------------

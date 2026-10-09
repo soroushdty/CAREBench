@@ -44,6 +44,7 @@ from tracks.reasoning.config_loader import (
     _validate_model_ids,
     load_config,
     validate_label_space_config,
+    validate_prompt_config,
 )
 from tracks.reasoning.context_builder import ContextBuilder
 from tracks.reasoning.dataset_loader import DatasetLoader
@@ -402,7 +403,7 @@ def _run_model(
 
     # --- Step c: Run LLM calls (or load from cache) ---
     client = LLMClient(cfg, label_space=label_space)
-    template = PromptTemplate(label_space)
+    template = PromptTemplate.from_config(cfg.get("prompt"), label_space)
 
     total_pairs = len(patient_ids)
     batch_size = int(cfg.get("local_batch_size", 8)) if cfg["backend"] == "local_transformers" else 1
@@ -413,15 +414,15 @@ def _run_model(
 
     # Pre-scan cache and build the list of items that still need inference.
     # Collecting all pending work upfront allows batching across pairs and
-    # conditions instead of issuing one GPU call per item.
+    # conditions instead of issuing one GPU call per item. A cached response
+    # made with a different prompt (for example after changing the label
+    # space or the prompt settings) is stale and is run again.
     pending: list[dict[str, str]] = []
+    n_stale = 0
     for pid, itxt in zip(patient_ids, item_texts):
         pid_str = str(pid)
         itxt_str = str(itxt)
         for condition in _CONDITIONS:
-            cached = cache.get(model_id, condition, pid_str, itxt_str)
-            if cached is not None and cached.error is None:
-                continue
             if condition == "context_free":
                 prompt = template.build_context_free_prompt(itxt_str)
             elif condition == "correct_context":
@@ -430,6 +431,11 @@ def _run_model(
             else:
                 shuffled_ctx = shuffled_context_map.get((pid_str, itxt_str), "")
                 prompt = template.build_shuffled_context_prompt(itxt_str, shuffled_ctx)
+            cached = cache.get(model_id, condition, pid_str, itxt_str)
+            if cached is not None and cached.error is None:
+                if cached.prompt_hash == PromptTemplate.get_prompt_hash(prompt):
+                    continue
+                n_stale += 1
             pending.append({
                 "prompt": prompt,
                 "model_id": model_id,
@@ -438,6 +444,11 @@ def _run_model(
                 "item_text": itxt_str,
             })
 
+    if n_stale:
+        logging.warning(
+            f"  {n_stale} cached response(s) were made with a different prompt "
+            "and will be run again."
+        )
     n_pending = len(pending)
     logging.info(f"  {n_pending} items to infer ({total_pairs * len(_CONDITIONS) - n_pending} cached)")
 
@@ -602,6 +613,7 @@ def _run_model(
         model_id=model_id,
         run_timestamp=run_timestamp,
         label_space=label_space,
+        category_type=template.category_type,
         is_dry_run=(cfg.get("backend") == "dry_run"),
         n_context_entities=len(set(patient_ids.tolist())),
         n_task_pairs=len(patient_ids),
@@ -682,6 +694,7 @@ def _validate_config_dict(cfg: dict[str, Any]) -> dict[str, Any]:
         )
 
     validate_label_space_config(data_section)
+    validate_prompt_config(cfg.get("prompt"))
     return cfg
 
 

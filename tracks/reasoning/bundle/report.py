@@ -46,7 +46,19 @@ def _fmt_ci(lo: Any, hi: Any, decimals: int = 4) -> str:
     return f"[{_fmt(lo, decimals)}, {_fmt(hi, decimals)}]"
 
 
-def _interpretation_paragraph(model: str, flag: str, row: pd.Series) -> str:
+def _categories(category_type: str) -> str:
+    """``"privacy categories"``, or ``"categories"`` with no category type."""
+    return f"{category_type} categories" if category_type else "categories"
+
+
+def _category_adjective(category_type: str) -> str:
+    """``"privacy-category"``, or ``"category"`` with no category type."""
+    return f"{category_type}-category" if category_type else "category"
+
+
+def _interpretation_paragraph(
+    model: str, flag: str, row: pd.Series, category_type: str = "privacy"
+) -> str:
     h1 = _fmt(row.get("H1_mean_abs_delta_correct"), 4)
     h1s = _fmt(row.get("H1_mean_abs_delta_shuffled"), 4)
     h4 = _fmt(row.get("H4_mean_alignment_difference"), 4)
@@ -56,7 +68,7 @@ def _interpretation_paragraph(model: str, flag: str, row: pd.Series) -> str:
         return (
             f"**{model}**: The model shows no detectable context sensitivity "
             f"(H1 mean |Δ| = {h1} ≤ ε). Adding patient context — whether correct "
-            "or shuffled — does not change the model's privacy-category scores. "
+            f"or shuffled — does not change the model's {_category_adjective(category_type)} scores. "
             "No further H2–H4 conclusions can be drawn."
         )
     if flag == "nonspecific_context_inflation":
@@ -101,6 +113,7 @@ def generate_markdown_report(
     output_path: str,
     run_params: Optional[Dict[str, Any]] = None,
     categories: Optional[List[str]] = None,
+    category_type: str = "privacy",
 ) -> None:
     """Write LLM_CONTEXT_SHIFT_REPORT.md to *output_path*.
 
@@ -120,7 +133,11 @@ def generate_markdown_report(
         Dict of CLI / run parameters (seed, epsilon, n_bootstrap, etc.).
     categories:
         Canonical category names for per-category tables.
+    category_type:
+        Word placed before "categories" in the report text (the assay
+        config's ``prompt.category_type``; ``""`` for none).
     """
+    category_type = category_type.strip()
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     cats = categories or []
     params = run_params or {}
@@ -129,16 +146,16 @@ def generate_markdown_report(
 
     sections = [
         _section_title(timestamp),
-        _section_objective(),
-        _section_data_pairing(hypothesis_summary, cats),
+        _section_objective(category_type),
+        _section_data_pairing(hypothesis_summary, cats, category_type),
         _section_models(models),
         _section_validation(validation_summary),
         _section_h1(h1_df, cats),
         _section_h2(h2_df, cats),
-        _section_h3(h3_effects_df, h3_corr_df, cats),
+        _section_h3(h3_effects_df, h3_corr_df, cats, category_type),
         _section_h4(h4_df, cats),
         _section_model_comparison(model_comparison),
-        _section_interpretation(hypothesis_summary),
+        _section_interpretation(hypothesis_summary, category_type),
         _section_limitations(),
         _section_reproducibility(params),
     ]
@@ -152,10 +169,10 @@ def _section_title(timestamp: str) -> str:
     return f"# LLM Context-Shift Analysis Report\n\n**Generated:** {timestamp}"
 
 
-def _section_objective() -> str:
+def _section_objective(category_type: str = "privacy") -> str:
     return (
         "## Objective\n\n"
-        "This report evaluates whether LLMs change their privacy-category judgments when "
+        f"This report evaluates whether LLMs change their {_category_adjective(category_type)} judgments when "
         "patient context is added, and whether those changes align with physician "
         "survey-to-interview judgment shifts more than shuffled (mismatched) context does.\n\n"
         "**Primary endpoint: H4** — the difference in directional alignment between correct "
@@ -170,13 +187,15 @@ def _section_objective() -> str:
     )
 
 
-def _section_data_pairing(hypothesis_summary: pd.DataFrame, cats: list[str]) -> str:
+def _section_data_pairing(
+    hypothesis_summary: pd.DataFrame, cats: list[str], category_type: str = "privacy"
+) -> str:
     n_patients = int(hypothesis_summary["n_patients"].max()) if not hypothesis_summary.empty and "n_patients" in hypothesis_summary.columns else "—"
     n_cats = len(cats) if cats else 10
     return (
         "## Data and Pairing\n\n"
         f"- **Patients:** {n_patients}\n"
-        f"- **Privacy categories:** {n_cats}\n"
+        f"- **{_categories(category_type).capitalize()}:** {n_cats}\n"
         "- **Physician conditions:** Survey (context-free) and Interview (context-aware)\n"
         "- **LLM conditions:** context-free, correct-context, shuffled-context\n"
         "- **Delta physician:** interview_consensus − survey_consensus per patient × item × category\n"
@@ -284,10 +303,15 @@ def _section_h2(h2_df: pd.DataFrame, cats: list[str]) -> str:
     return "\n".join(lines)
 
 
-def _section_h3(h3_effects: pd.DataFrame, h3_corr: pd.DataFrame, cats: list[str]) -> str:
+def _section_h3(
+    h3_effects: pd.DataFrame,
+    h3_corr: pd.DataFrame,
+    cats: list[str],
+    category_type: str = "privacy",
+) -> str:
     lines = [
         "## H3: Class-Level Context-Effect Correspondence\n",
-        "**Question:** Are the same privacy categories context-sensitive for physicians and the LLM?\n",
+        f"**Question:** Are the same {_categories(category_type)} context-sensitive for physicians and the LLM?\n",
         "Pearson and Spearman correlations between class-level mean physician deltas and LLM deltas. "
         "P-values from permutation tests (permute category labels).\n",
     ]
@@ -403,14 +427,16 @@ def _section_model_comparison(model_comparison: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def _section_interpretation(hypothesis_summary: pd.DataFrame) -> str:
+def _section_interpretation(
+    hypothesis_summary: pd.DataFrame, category_type: str = "privacy"
+) -> str:
     if hypothesis_summary is None or hypothesis_summary.empty:
         return "## Interpretation\n\nNo results to interpret."
     lines = ["## Interpretation\n"]
     for _, row in hypothesis_summary.iterrows():
         model = str(row.get("model", "Unknown"))
         flag = str(row.get("interpretation_flag", "failed_validation"))
-        lines.append(_interpretation_paragraph(model, flag, row))
+        lines.append(_interpretation_paragraph(model, flag, row, category_type))
         lines.append("")
     return "\n".join(lines)
 

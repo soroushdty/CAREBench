@@ -9,8 +9,9 @@ across interrupted runs. Cache files are stored in a structured directory:
 Where ``item_hash = hashlib.sha256(item_text.encode()).hexdigest()[:12]``.
 
 The cache key is ``(model_id, condition, patient_id, item_text)``. The
-``prompt_hash`` is stored for audit but is not part of the primary key,
-allowing prompt iteration without invalidating the cache structure.
+``prompt_hash`` is stored with each response but is not part of the key;
+the assay runner compares it with the current prompt and runs the call again
+when they differ, so a changed prompt never reuses an older answer.
 """
 
 from __future__ import annotations

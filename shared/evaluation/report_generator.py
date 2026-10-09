@@ -106,6 +106,9 @@ class ReportGenerator:
     label_space:
         Optional :class:`~shared.label_space.LabelSpace`. Results are looked
         up by its keys and tables show its display names.
+    category_type:
+        Word placed before "categories" in the report text (the assay
+        config's ``prompt.category_type``; ``""`` for none).
     """
 
     def __init__(
@@ -122,6 +125,7 @@ class ReportGenerator:
         n_context_entities: int | None = None,
         n_task_pairs: int | None = None,
         label_space: LabelSpace | None = None,
+        category_type: str = "privacy",
     ) -> None:
         self._h1 = h1_result
         self._h2 = h2_result
@@ -138,6 +142,7 @@ class ReportGenerator:
             )
             self._category_labels = list(self._category_names)
         self._h2_per_category = h2_per_category
+        self._category_type = category_type.strip()
         self._is_dry_run = is_dry_run
         self._n_context_entities = n_context_entities
         self._n_task_pairs = n_task_pairs
@@ -185,6 +190,14 @@ class ReportGenerator:
             return "patients"
         return f"**{self._n_context_entities} patients**"
 
+    def _categories(self) -> str:
+        """``"privacy categories"``, or ``"categories"`` with no category type."""
+        return f"{self._category_type} categories" if self._category_type else "categories"
+
+    def _category_adjective(self) -> str:
+        """``"privacy-category"``, or ``"category"`` with no category type."""
+        return f"{self._category_type}-category" if self._category_type else "category"
+
     def _cohort_sentence(self) -> str:
         if self._n_context_entities is None:
             return ""
@@ -221,7 +234,7 @@ class ReportGenerator:
             "and a context-aware interview phase (reference_correct_context). "
             f"{self._cohort_sentence()}"
             "Reference observers assessed items (task_instance) across "
-            f"{len(self._category_names)} privacy categories (output_dimension), yielding "
+            f"{len(self._category_names)} {self._categories()} (output_dimension), yielding "
             "paired consensus labels (Physician_Survey_Consensus and "
             "Physician_Interview_Consensus). The physician judgment delta "
             "(delta_reference) is defined as the interview consensus minus the survey "
@@ -237,7 +250,7 @@ class ReportGenerator:
             "3. **Shuffled-context:** item text with a randomly selected *different* "
             "patient's clinical snapshot (control condition).\n\n"
             "The LLM outputs a JSON object with probability scores (0–1) for each of "
-            "the privacy categories (output_dimension). Delta_LLM_Correct is "
+            f"the {self._categories()} (output_dimension). Delta_LLM_Correct is "
             "defined as the correct-context score minus the context-free score. "
             "Delta_LLM_Shuffled is defined as the shuffled-context score minus the "
             "context-free score.\n\n"
@@ -276,7 +289,7 @@ class ReportGenerator:
 
         lines = [
             "### H1 — Context Sensitivity\n",
-            "**Hypothesis:** The LLM (candidate_id) changes its privacy-category "
+            f"**Hypothesis:** The LLM (candidate_id) changes its {self._category_adjective()} "
             "scores (output_dimension) when patient context (context_entity_id) "
             "is added (mean absolute Delta_LLM_Correct > 0).\n",
             f"- **Aggregate mean absolute delta:** {point}  ",
@@ -343,8 +356,8 @@ class ReportGenerator:
 
         lines = [
             "### H3 — Class-Level Correspondence\n",
-            "**Hypothesis:** The pattern of LLM context effects across privacy "
-            "categories (output_dimension) correlates with the pattern of "
+            "**Hypothesis:** The pattern of LLM context effects across "
+            f"{self._categories()} (output_dimension) correlates with the pattern of "
             "reference_observer judgment shifts (delta_reference) "
             "(Pearson r of class-level mean deltas).\n",
             f"- **Pearson r:** {r_val}  ",

@@ -57,7 +57,15 @@ class_definitions:
 
 In Track 3 these keys go under `data:`; in Track 1 they are top-level. Keys default to the name in snake_case (`Mood & anxiety` → `mood_anxiety`). A class named like a default category (for example `Genetics`) keeps that category's key and definition unless you override them. A class with no definition appears in the prompt by its key only, and Track 3 logs a warning. Keys and display names must be unique; config validation reports duplicates, malformed keys, and definitions for names that are not in `classes`.
 
-With the default ten classes and no `class_definitions`, prompts are byte-identical to earlier versions, so cached responses stay valid.
+The Track 3 prompt's opening line and the word before "categories" are set in the assay config's optional `prompt` section. The defaults suit the SHARES taxonomy:
+
+```yaml
+prompt:
+  intro: You are a clinical documentation expert. Classify the following EHR item into note sections.
+  category_type: ""        # default "privacy"; also used in the report text
+```
+
+With the default ten classes, no `class_definitions` and no `prompt` section, prompts are byte-identical to earlier versions, so cached responses stay valid. Track 3 compares each cached response's prompt hash with the current prompt and runs the call again when they differ, so changing the label space or the prompt never reuses answers to an older prompt.
 
 ### Column Mapping (`adapters/paired_context/column_map.py`)
 

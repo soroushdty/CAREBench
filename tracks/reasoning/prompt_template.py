@@ -33,10 +33,13 @@ CATEGORY_NAMES: list[str] = DEFAULT_LABEL_SPACE.keys()
 # Shared prompt fragments
 # ---------------------------------------------------------------------------
 
-_INTRO = (
+DEFAULT_INTRO = (
     "You are a clinical privacy expert. "
     "Classify the following EHR item into privacy categories."
 )
+
+# Word placed before "categories" in the scoring instruction ("" for none).
+DEFAULT_CATEGORY_TYPE = "privacy"
 
 _NUMBER_WORDS = (
     "zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
@@ -45,15 +48,21 @@ _NUMBER_WORDS = (
 )
 
 
-def _category_header(n_categories: int) -> str:
+def categories_phrase(category_type: str, plural: bool = True) -> str:
+    """``"privacy categories"``, or ``"categories"`` when *category_type* is empty."""
+    noun = "categories" if plural else "category"
+    return f"{category_type} {noun}" if category_type else noun
+
+
+def _category_header(n_categories: int, category_type: str) -> str:
     count = (
         _NUMBER_WORDS[n_categories]
         if n_categories < len(_NUMBER_WORDS)
         else str(n_categories)
     )
-    noun = "category" if n_categories == 1 else "categories"
+    phrase = categories_phrase(category_type, plural=n_categories != 1)
     return (
-        f"For each of the following {count} privacy {noun}, provide a score between 0.0 and 1.0\n"
+        f"For each of the following {count} {phrase}, provide a score between 0.0 and 1.0\n"
         "representing the probability that this item belongs to that category."
     )
 
@@ -96,17 +105,52 @@ class PromptTemplate:
         The categories listed in the prompt and required in the JSON answer.
         Defaults to the ten SHARES categories. Categories without a
         definition are listed by key only.
+    intro : str, optional
+        Opening instruction. Defaults to :data:`DEFAULT_INTRO`.
+    category_type : str, optional
+        Word placed before "categories" in the scoring instruction
+        (``"privacy"`` by default; ``""`` for none).
     """
 
-    def __init__(self, label_space: LabelSpace | None = None) -> None:
+    def __init__(
+        self,
+        label_space: LabelSpace | None = None,
+        *,
+        intro: str | None = None,
+        category_type: str | None = None,
+    ) -> None:
         self._label_space = label_space or DEFAULT_LABEL_SPACE
-        self._header = _category_header(len(self._label_space))
+        self._intro = DEFAULT_INTRO if intro is None else intro.strip()
+        if not self._intro:
+            raise ValueError("The prompt intro must not be empty.")
+        self._category_type = (
+            DEFAULT_CATEGORY_TYPE if category_type is None else category_type.strip()
+        )
+        self._header = _category_header(len(self._label_space), self._category_type)
         self._category_block = _category_block(self._label_space)
         self._json_format = _json_format(self._label_space)
+
+    @classmethod
+    def from_config(
+        cls,
+        prompt_cfg: dict | None,
+        label_space: LabelSpace | None = None,
+    ) -> PromptTemplate:
+        """Build from the assay config's optional ``prompt`` section."""
+        prompt_cfg = prompt_cfg or {}
+        return cls(
+            label_space,
+            intro=prompt_cfg.get("intro"),
+            category_type=prompt_cfg.get("category_type"),
+        )
 
     @property
     def label_space(self) -> LabelSpace:
         return self._label_space
+
+    @property
+    def category_type(self) -> str:
+        return self._category_type
 
     # ------------------------------------------------------------------
     # Public prompt builders
@@ -126,7 +170,7 @@ class PromptTemplate:
             Deterministic prompt for the ``context_free`` condition.
         """
         parts = [
-            _INTRO,
+            self._intro,
             "",
             f"ITEM: {item_text}",
             "",
@@ -251,7 +295,7 @@ class PromptTemplate:
     def _build_context_prompt(self, item_text: str, context_text: str) -> str:
         """Shared builder for correct-context and shuffled-context prompts."""
         parts = [
-            _INTRO,
+            self._intro,
             "",
             f"ITEM: {item_text}",
             "",

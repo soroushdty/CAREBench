@@ -30,6 +30,14 @@ permutation_seed: 42
 n_bootstrap_resamples: 1000
 n_permutations: 10000
 
+# Prompt wording (optional). Defaults shown; change them for a taxonomy that
+# is not about privacy. category_type is the word before "categories" in the
+# prompt and the reports ("" for none). A changed prompt invalidates the
+# matching cached responses, which are then run again.
+# prompt:
+#   intro: "You are a clinical privacy expert. Classify the following EHR item into privacy categories."
+#   category_type: privacy
+
 # Label leakage checking: set to true to skip validation (useful for datasets with known leakage issues)
 skip_label_leakage_check: false
 

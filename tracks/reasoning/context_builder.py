@@ -1,5 +1,5 @@
 """
-Context builder for the LLM Context-Shift Assay.
+Context builder for Track 3 (reasoning).
 
 Builds correct and shuffled patient context strings for each Patient_Item_Pair.
 Context records are loaded through the adapter boundary (PairedContextContextAdapter)

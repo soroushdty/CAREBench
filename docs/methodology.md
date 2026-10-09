@@ -138,7 +138,7 @@ Most of the machinery in LM-ContextProbe exists because a simpler version gave a
 
 ## Scope of claims
 
-Results are claims about **the patients and reference observers in the evaluated dataset**. With few patients, between-patient generalization is weak by construction, and the cluster bootstrap makes that visible in the interval widths. A null result is informative: the assay is designed to show the absence of appropriate context sensitivity as readily as its presence.
+Results are claims about **the patients and reference observers in the evaluated dataset**. With few patients, between-patient generalization is weak by construction, and the cluster bootstrap makes that visible in the interval widths. A null result is informative: the framework is designed to show the absence of appropriate context sensitivity as readily as its presence.
 
 ## Known limitations
 

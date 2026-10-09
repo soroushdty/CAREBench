@@ -90,7 +90,7 @@ def minimal_track1_run(tmp_path: Path) -> Path:
 def minimal_track3_run(tmp_path: Path) -> Path:
     """Run a minimal Track 3 manifest emission with synthetic data.
 
-    This does NOT run the full assay pipeline (which requires real data).
+    This does NOT run the full Track 3 pipeline (which requires real data).
     Instead it directly calls the manifest helpers to produce the expected
     artifact tree, simulating what a successful dry-run would produce.
 
@@ -113,7 +113,7 @@ def minimal_track3_run(tmp_path: Path) -> Path:
         run_id="test_run_003",
         track="reasoning",
         entry_command="python main.py --track reasoning -- --dry_run",
-        config_path="configs/assay_config.yaml",
+        config_path="configs/reasoning_config.yaml",
         dry_run=True,
         extra={"model_ids": ["dry_run_example"]},
     )

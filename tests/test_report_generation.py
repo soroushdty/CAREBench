@@ -1,4 +1,4 @@
-"""Tests for assay.bundle.report.generate_markdown_report and assay.bundle.summary."""
+"""Tests for tracks.reasoning.bundle.report.generate_markdown_report and tracks.reasoning.bundle.summary."""
 
 from __future__ import annotations
 

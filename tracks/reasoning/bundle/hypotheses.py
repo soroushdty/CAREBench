@@ -9,8 +9,8 @@ bootstrap; p-values use permutation tests.
 
 Reuses:
 - ``shared.statistical.bootstrap.patient_block_bootstrap``
-- ``assay.hypothesis_analyzer.permutation_test_h3``
-- ``assay.hypothesis_analyzer.permutation_test_h4``
+- ``shared.evaluation.hypothesis_analyzer.permutation_test_h3``
+- ``shared.evaluation.hypothesis_analyzer.permutation_test_h4``
 """
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 """
-Schema Validator for the LLM Context-Shift Assay.
+Schema Validator for Track 3 (reasoning).
 
 Validates LLM JSON responses against the output dimensions of a label space
 (by default the ten SHARES categories). Handles common LLM output artifacts

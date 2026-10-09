@@ -7,13 +7,13 @@ produces paired cell deltas, the four Track 3 endpoint results
 (shared/endpoints.py), a Markdown report,
 and a ZIP bundle.
 
-Usage (assay scores directory — auto-discovers all model subdirectories):
+Usage (Track 3 scores directory — auto-discovers all model subdirectories):
     python scripts/analyze_llm_context_effects.py \\
         --dataset dataset.xlsx \\
-        --scores-dir output/assay/scores \\
+        --scores-dir output/reasoning/scores \\
         --output-dir outputs/analysis
 
-    The scores directory must follow the layout written by run_assay.py:
+    The scores directory must follow the layout written by run_reasoning.py:
         {scores_dir}/{model_slug}/context_free_scores.csv
         {scores_dir}/{model_slug}/correct_context_scores.csv
         {scores_dir}/{model_slug}/shuffled_context_scores.csv
@@ -35,7 +35,7 @@ Usage (combined long-format file with 'condition' column):
         --output-dir outputs/analysis
 
 The categories default to the ten SHARES categories. For another taxonomy,
-pass the assay config with --config; its data.classes and
+pass the reasoning config with --config; its data.classes and
 data.class_definitions are used.
 """
 
@@ -86,8 +86,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--scores-dir", dest="scores_dir", default=None,
         help=(
-            "Root directory written by run_assay.py "
-            "(e.g. output/assay/scores). Each subdirectory is treated as one "
+            "Root directory written by run_reasoning.py "
+            "(e.g. output/reasoning/scores). Each subdirectory is treated as one "
             "model slug and must contain context_free_scores.csv, "
             "correct_context_scores.csv, and shuffled_context_scores.csv. "
             "Takes priority over --context-free / --correct-context / "
@@ -139,7 +139,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--config", default=None,
         help=(
-            "Assay config whose data.classes and data.class_definitions define the "
+            "Reasoning config whose data.classes and data.class_definitions define the "
             "categories, and whose prompt.category_type sets the report wording "
             "(default: the ten SHARES privacy categories)"
         ),
@@ -149,7 +149,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def _load_label_space(config_path: str | None) -> tuple[LabelSpace, dict | None, str]:
-    """Label space, class_definitions and category type from an assay config.
+    """Label space, class_definitions and category type from a reasoning config.
 
     Without a config: the ten SHARES categories and ``"privacy"``.
     """
@@ -177,7 +177,7 @@ _CONDITION_FILES = {
 
 
 def merge_scores_dir(scores_dir: str) -> tuple[str, str, str]:
-    """Merge per-model score subdirectories written by run_assay.py.
+    """Merge per-model score subdirectories written by run_reasoning.py.
 
     Expects the layout::
 
@@ -190,7 +190,7 @@ def merge_scores_dir(scores_dir: str) -> tuple[str, str, str]:
             ...
 
     The model name is recovered by replacing ``--`` with ``/`` in the slug
-    (matching the slug convention in ``assay.llm_client.LLMClient.model_id_slug``).
+    (matching the slug convention in ``tracks.reasoning.llm_client.LLMClient.model_id_slug``).
 
     Returns three paths to merged temporary CSV files written alongside the
     scores_dir:  ``{scores_dir}/_merged_{condition}.csv``.  Each file has a

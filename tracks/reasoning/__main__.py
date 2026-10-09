@@ -1,6 +1,6 @@
-"""Allow execution via: python -m tracks.reasoning.run_assay"""
+"""Allow execution via: python -m tracks.reasoning.run_reasoning"""
 import sys
 
-from tracks.reasoning.run_assay import main
+from tracks.reasoning.run_reasoning import main
 
 sys.exit(main())

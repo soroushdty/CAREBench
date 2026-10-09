@@ -1,4 +1,4 @@
-"""Tests for assay.bundle.delta_builder.build_paired_cell_deltas."""
+"""Tests for tracks.reasoning.bundle.delta_builder.build_paired_cell_deltas."""
 
 from __future__ import annotations
 

@@ -65,7 +65,7 @@ class DatasetLoader:
     Parameters
     ----------
     cfg : dict
-        Validated assay/reasoning configuration dictionary.
+        Validated reasoning configuration dictionary.
         Expected structure: ``cfg["data"]`` with keys for dataset_path,
         patient_summaries_path, train_sheet, test_sheet, interview_sheet,
         patient_col, physician_col, item_col, classes, and optionally

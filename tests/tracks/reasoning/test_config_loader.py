@@ -30,10 +30,10 @@ VALID_CONFIG: dict = {
     "permutation_seed": 42,
     "n_bootstrap_resamples": 1000,
     "n_permutations": 10000,
-    "output_dir": "output/assay",
-    "cache_dir": "output/assay/cache",
-    "scores_dir": "output/assay/scores",
-    "reports_dir": "output/assay/reports",
+    "output_dir": "output/reasoning",
+    "cache_dir": "output/reasoning/cache",
+    "scores_dir": "output/reasoning/scores",
+    "reports_dir": "output/reasoning/reports",
     "data": {
         "dataset_path": "examples/synthetic/dataset.xlsx",
         "patient_summaries_path": "examples/synthetic/patient_summaries.json",
@@ -61,7 +61,7 @@ VALID_CONFIG: dict = {
 
 def _write_config(tmp_path: Path, cfg: dict) -> Path:
     """Write a config dict to a temporary YAML file and return its path."""
-    p = tmp_path / "assay_config.yaml"
+    p = tmp_path / "reasoning_config.yaml"
     p.write_text(yaml.dump(cfg), encoding="utf-8")
     return p
 
@@ -133,8 +133,8 @@ class TestLoadConfigValid:
         assert isinstance(cfg, dict)
 
     def test_actual_config_file_loads(self):
-        """The shipped assay_config.yaml loads in dry_run mode (no HF token needed)."""
-        config_path = Path(__file__).resolve().parents[2] / "configs" / "assay_config.yaml"
+        """The shipped reasoning_config.yaml loads in dry_run mode (no HF token needed)."""
+        config_path = Path(__file__).resolve().parents[3] / "configs" / "reasoning_config.yaml"
         # The shipped config uses huggingface backend; load it after patching to dry_run
         import copy
         raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))

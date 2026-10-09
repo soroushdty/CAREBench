@@ -1,4 +1,4 @@
-"""Tests for assay.bundle.validator.validate_inputs."""
+"""Tests for tracks.reasoning.bundle.validator.validate_inputs."""
 
 from __future__ import annotations
 

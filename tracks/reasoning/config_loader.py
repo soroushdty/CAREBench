@@ -1,7 +1,7 @@
 """
-Configuration loader for the LLM Context-Shift Assay.
+Configuration loader for Track 3 (reasoning).
 
-Loads and validates assay_config.yaml, raising ConfigError with details
+Loads and validates reasoning_config.yaml, raising ConfigError with details
 for any missing or invalid parameter.
 """
 
@@ -19,7 +19,7 @@ import yaml
 # ---------------------------------------------------------------------------
 
 class ConfigError(Exception):
-    """Raised when the assay configuration is invalid or incomplete."""
+    """Raised when the reasoning configuration is invalid or incomplete."""
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ def validate_prompt_config(prompt_cfg: Any) -> None:
 
 
 def load_config(config_path: str | Path) -> dict[str, Any]:
-    """Load and validate the assay configuration file.
+    """Load and validate the reasoning configuration file.
 
     Parameters
     ----------

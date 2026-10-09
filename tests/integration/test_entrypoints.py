@@ -48,7 +48,7 @@ class TestHelpCommands:
         assert result.returncode == 0, f"stderr: {result.stderr}"
 
     def test_module_reasoning_help(self):
-        result = _run([sys.executable, "-m", "tracks.reasoning.run_assay", "--help"])
+        result = _run([sys.executable, "-m", "tracks.reasoning.run_reasoning", "--help"])
         assert result.returncode == 0, f"stderr: {result.stderr}"
 
     def test_module_representation_help(self):

@@ -1,5 +1,5 @@
 """
-Report Generator for the LLM Context-Shift Assay.
+Report Generator for Track 3 (reasoning).
 
 Produces a single markdown file per model run using Python string formatting
 only (no external templating library).
@@ -114,7 +114,7 @@ class ReportGenerator:
         Optional :class:`~shared.label_space.LabelSpace`. Results are looked
         up by its keys and tables show its display names.
     category_type:
-        Word placed before "categories" in the report text (the assay
+        Word placed before "categories" in the report text (the reasoning
         config's ``prompt.category_type``; ``""`` for none).
     legacy_aliases:
         Optional endpoint name → old hypothesis number (e.g.
@@ -235,7 +235,7 @@ class ReportGenerator:
                 "mock LLM responses for pipeline validation only.**\n"
             )
         lines.append(
-            "# LLM Context-Shift Assay Report\n\n"
+            "# Track 3 (Reasoning) Context-Shift Report\n\n"
             f"**Model:** {self._model_id}  \n"
             f"**Run timestamp:** {self._run_timestamp}"
         )
@@ -247,7 +247,7 @@ class ReportGenerator:
         return (
             "## Methods\n\n"
             "### Dataset\n\n"
-            "The assay uses a paired dataset of EHR items evaluated by physicians "
+            "Track 3 uses a paired dataset of EHR items evaluated by physicians "
             "in two conditions: a context-free survey phase (reference_context_free) "
             "and a context-aware interview phase (reference_correct_context). "
             f"{self._cohort_sentence()}"
@@ -500,7 +500,7 @@ class ReportGenerator:
             f"({self._model_id}) evaluated at a single point in time "
             f"({self._run_timestamp}). Results may vary across model versions "
             "or inference configurations.\n"
-            "3. **No prediction accuracy claims:** This assay measures context "
+            "3. **No prediction accuracy claims:** Track 3 measures context "
             "sensitivity and directional alignment only. It does not evaluate "
             "classification performance and does not report Brier score, F1, "
             "AUROC, or any measure of prediction accuracy.\n"

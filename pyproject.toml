@@ -39,7 +39,7 @@ exclude = ["tests*", "docs*", "data*", "output*"]
 [tool.setuptools.data-files]
 "configs" = [
   "configs/main_config.yaml",
-  "configs/assay_config.yaml",
+  "configs/reasoning_config.yaml",
 ]
 
 [project.optional-dependencies]

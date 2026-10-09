@@ -20,7 +20,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from tracks.reasoning.run_assay import main
+from tracks.reasoning.run_reasoning import main
 from tracks.reasoning.schema_validator import REQUIRED_KEYS
 
 
@@ -35,13 +35,13 @@ def dry_run_output(tmp_path, monkeypatch):
 
     Uses tmp_path as the output directory so tests are isolated.
     Monkeypatches the working directory to the repo root so that
-    relative paths in configs/assay_config.yaml resolve correctly.
+    relative paths in configs/reasoning_config.yaml resolve correctly.
     """
     # Ensure we run from the repo root so data/ paths resolve
     repo_root = Path(__file__).resolve().parents[3]
     monkeypatch.chdir(repo_root)
 
-    config_path = repo_root / "configs" / "assay_config.yaml"
+    config_path = repo_root / "configs" / "reasoning_config.yaml"
     if not config_path.exists():
         pytest.skip(f"Config not found: {config_path}")
 

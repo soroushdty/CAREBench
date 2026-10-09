@@ -7,8 +7,14 @@ Each function accepts a ``cells_df`` (paired cell deltas for a single model),
 the model name, and statistical parameters.  All CIs use patient-cluster
 bootstrap; p-values use permutation tests.
 
+Context sensitivity and directional alignment use the shuffled-context
+condition as their reference: a paired sign-flip test of |Δ_correct| −
+|Δ_shuffled|, and a permutation null that shuffles each patient's model
+deltas among that patient's items.
+
 Reuses:
 - ``shared.statistical.bootstrap.patient_block_bootstrap``
+- ``shared.statistical.cluster_tests.within_cluster_permutation_test``
 - ``shared.evaluation.hypothesis_analyzer.permutation_test_h3``
 - ``shared.evaluation.hypothesis_analyzer.permutation_test_h4``
 """
@@ -23,6 +29,10 @@ import pandas as pd
 import scipy.stats
 
 from shared.statistical.bootstrap import patient_block_bootstrap
+from shared.statistical.cluster_tests import (
+    cluster_sign_flip_test,
+    within_cluster_permutation_test,
+)
 from shared.evaluation.hypothesis_analyzer import permutation_test_h3, permutation_test_h4
 
 logger = logging.getLogger(__name__)
@@ -91,8 +101,14 @@ def compute_h1(
     epsilon: float = 0.01,
     n_bootstrap: int = 1000,
     seed: int = 2026,
+    n_permutations: int = 10000,
 ) -> pd.DataFrame:
     """Compute context sensitivity (formerly H1) for correct and shuffled conditions.
+
+    The test is whether the correct patient's context moves the scores more
+    than another patient's: the paired difference |Δ_correct| − |Δ_shuffled|
+    gets a patient-cluster bootstrap CI and a one-sided patient-cluster
+    sign-flip p-value.
 
     Parameters
     ----------
@@ -109,6 +125,9 @@ def compute_h1(
         Number of patient-cluster bootstrap resamples.
     seed:
         RNG seed.
+    n_permutations:
+        Monte Carlo replicates for the sign-flip test when exact enumeration
+        is too large.
 
     Returns
     -------
@@ -117,7 +136,9 @@ def compute_h1(
         Columns: model, category, n_patients, n_patient_items, n_cells,
         mean_abs_delta_correct, ci_low_correct, ci_high_correct,
         mean_abs_delta_shuffled, ci_low_shuffled, ci_high_shuffled,
-        proportion_changed_correct, proportion_changed_shuffled, epsilon.
+        mean_abs_delta_difference, ci_low_difference, ci_high_difference,
+        paired_permutation_p, proportion_changed_correct,
+        proportion_changed_shuffled, epsilon.
     """
     df = cells_df.copy()
     patient_col = "patient" if "patient" in df.columns else "patient_id"
@@ -145,6 +166,10 @@ def compute_h1(
 
         pt_c, lo_c, hi_c = _bootstrap_scalar(abs_dc, pids, n_bootstrap, seed)
         pt_s, lo_s, hi_s = _bootstrap_scalar(abs_ds, pids, n_bootstrap, seed + 1)
+        pt_d, lo_d, hi_d = _bootstrap_scalar(abs_dc - abs_ds, pids, n_bootstrap, seed + 2)
+        p_diff = cluster_sign_flip_test(
+            abs_dc - abs_ds, pids, n_permutations, np.random.default_rng(seed + 3)
+        )
 
         prop_c = float(np.mean(abs_dc > epsilon))
         prop_s = float(np.mean(abs_ds > epsilon))
@@ -161,6 +186,10 @@ def compute_h1(
             "mean_abs_delta_shuffled": pt_s,
             "ci_low_shuffled": lo_s,
             "ci_high_shuffled": hi_s,
+            "mean_abs_delta_difference": pt_d,
+            "ci_low_difference": lo_d,
+            "ci_high_difference": hi_d,
+            "paired_permutation_p": p_diff,
             "proportion_changed_correct": prop_c,
             "proportion_changed_shuffled": prop_s,
             "epsilon": epsilon,
@@ -187,6 +216,8 @@ def _nan_h1_row(model: str, category: str, epsilon: float) -> dict:
         "n_patients": 0, "n_patient_items": 0, "n_cells": 0,
         "mean_abs_delta_correct": nan, "ci_low_correct": nan, "ci_high_correct": nan,
         "mean_abs_delta_shuffled": nan, "ci_low_shuffled": nan, "ci_high_shuffled": nan,
+        "mean_abs_delta_difference": nan, "ci_low_difference": nan, "ci_high_difference": nan,
+        "paired_permutation_p": nan,
         "proportion_changed_correct": nan, "proportion_changed_shuffled": nan,
         "epsilon": epsilon,
     }
@@ -204,8 +235,14 @@ def compute_h2(
     epsilon: float = 0.01,
     n_bootstrap: int = 1000,
     seed: int = 2026,
+    n_permutations: int = 10000,
 ) -> pd.DataFrame:
     """Compute directional alignment (formerly H2) (correct and shuffled) where Δ_physician ≠ 0.
+
+    A near-zero LLM delta counts as disagreement, so chance agreement is not
+    0.5. The aggregate row adds a permutation null: each patient's model
+    delta rows (all categories of an item together) are shuffled among that
+    patient's items, and the sign-agreement rate is recomputed.
 
     Parameters
     ----------
@@ -221,6 +258,8 @@ def compute_h2(
         Bootstrap resamples.
     seed:
         RNG seed.
+    n_permutations:
+        Permutations for the null of the aggregate sign-agreement rate.
 
     Returns
     -------
@@ -229,7 +268,11 @@ def compute_h2(
         Columns: model, category, n_patients, n_shift_cells,
         mean_alignment_correct, ci_low_correct, ci_high_correct,
         mean_alignment_shuffled, ci_low_shuffled, ci_high_shuffled,
-        sign_agreement_correct, sign_agreement_shuffled, epsilon.
+        sign_agreement_correct, sign_agreement_shuffled,
+        unchanged_rate_correct, unchanged_rate_shuffled (share of shift
+        cells with |Δ_LLM| < epsilon), null_sign_agreement_correct and
+        permutation_p_correct (aggregate row only; NaN per category),
+        epsilon.
     """
     df = cells_df.copy()
     patient_col = "patient" if "patient" in df.columns else "patient_id"
@@ -265,6 +308,11 @@ def compute_h2(
         sa_c = float(np.mean(sign_agree_c))
         sa_s = float(np.mean(sign_agree_s))
 
+        null_c = p_c = float("nan")
+        if category == _AGGREGATE_LABEL:
+            null = _sign_agreement_null(df, patient_col, epsilon, n_permutations, seed + 2)
+            null_c, p_c = null["null_mean"], null["p_value"]
+
         return {
             "model": model,
             "category": category,
@@ -278,6 +326,10 @@ def compute_h2(
             "ci_high_shuffled": hi_s,
             "sign_agreement_correct": sa_c,
             "sign_agreement_shuffled": sa_s,
+            "unchanged_rate_correct": float(np.mean(dc_adj == 0.0)),
+            "unchanged_rate_shuffled": float(np.mean(ds_adj == 0.0)),
+            "null_sign_agreement_correct": null_c,
+            "permutation_p_correct": p_c,
             "epsilon": epsilon,
         }
 
@@ -299,8 +351,47 @@ def _nan_h2_row(model: str, category: str, epsilon: float) -> dict:
         "mean_alignment_correct": nan, "ci_low_correct": nan, "ci_high_correct": nan,
         "mean_alignment_shuffled": nan, "ci_low_shuffled": nan, "ci_high_shuffled": nan,
         "sign_agreement_correct": nan, "sign_agreement_shuffled": nan,
+        "unchanged_rate_correct": nan, "unchanged_rate_shuffled": nan,
+        "null_sign_agreement_correct": nan, "permutation_p_correct": nan,
         "epsilon": epsilon,
     }
+
+
+def _sign_agreement_null(
+    df: pd.DataFrame,
+    patient_col: str,
+    epsilon: float,
+    n_permutations: int,
+    seed: int,
+) -> dict[str, float]:
+    """Within-patient permutation null for the aggregate sign-agreement rate.
+
+    Cells are pivoted to one row per (patient, item) with one column per
+    category, so an item's categories move together. Missing cells are NaN
+    and do not count.
+    """
+    keys = [patient_col, "item_text"] if "item_text" in df.columns else [patient_col]
+    wide = df.pivot_table(
+        index=keys, columns="category",
+        values=["delta_physician", "delta_llm_correct"], aggfunc="mean",
+    )
+    dp = wide["delta_physician"].to_numpy(dtype=float)
+    dm = wide["delta_llm_correct"].to_numpy(dtype=float)
+    dm = np.where(np.abs(dm) < epsilon, 0.0, dm)
+    pids = wide.index.get_level_values(patient_col).astype(str).to_numpy()
+    sign_dp = np.sign(dp)
+    shift = (dp != 0.0) & ~np.isnan(dp)
+
+    def _rate(dm_: np.ndarray) -> float:
+        valid = shift & ~np.isnan(dm_)
+        if not np.any(valid):
+            return float("nan")
+        return float(np.mean((np.sign(dm_) == sign_dp)[valid]))
+
+    return within_cluster_permutation_test(
+        _rate, dm, pids, n_permutations=n_permutations,
+        rng=np.random.default_rng(seed),
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -239,8 +239,11 @@ def _section_validation(validation_summary: pd.DataFrame) -> str:
 def _section_h1(h1_df: pd.DataFrame, cats: list[str]) -> str:
     lines = [
         f"## {CONTEXT_SENSITIVITY_T3.heading}\n",
-        "**Question:** Does the LLM change its judgments when patient context is added?\n",
-        "Computed for both correct and shuffled contexts. Bootstrap CIs use patient-cluster resampling.\n",
+        "**Question:** Does the correct patient's context change the LLM's judgments more than another patient's context does?\n",
+        "Computed for both correct and shuffled contexts. Almost any added text moves the scores, "
+        "so the test is whether the correct patient's context moves them more than the shuffled one: "
+        "mean |Δ_correct| − |Δ_shuffled|, with a patient-cluster bootstrap CI and a one-sided "
+        "patient-cluster sign-flip p-value.\n",
     ]
 
     for model, grp in (h1_df.groupby("model") if h1_df is not None and not h1_df.empty else []):
@@ -253,6 +256,9 @@ def _section_h1(h1_df: pd.DataFrame, cats: list[str]) -> str:
                      f"95% CI {_fmt_ci(r.get('ci_low_correct'), r.get('ci_high_correct'))}")
         lines.append(f"- **Mean |Δ_LLM| shuffled:** {_fmt(r.get('mean_abs_delta_shuffled'))} "
                      f"95% CI {_fmt_ci(r.get('ci_low_shuffled'), r.get('ci_high_shuffled'))}")
+        lines.append(f"- **Difference (correct − shuffled):** {_fmt(r.get('mean_abs_delta_difference'))} "
+                     f"95% CI {_fmt_ci(r.get('ci_low_difference'), r.get('ci_high_difference'))}, "
+                     f"sign-flip p = {_fmt_p(r.get('paired_permutation_p'))}")
         lines.append(f"- **Proportion changed (correct):** {_fmt(r.get('proportion_changed_correct'))}")
         lines.append(f"- **Proportion changed (shuffled):** {_fmt(r.get('proportion_changed_shuffled'))}\n")
 
@@ -279,7 +285,9 @@ def _section_h2(h2_df: pd.DataFrame, cats: list[str]) -> str:
     lines = [
         f"## {DIRECTIONAL_ALIGNMENT_T3.heading}\n",
         "**Question:** When physicians shift after context, does the LLM move in the same direction?\n",
-        "Restricted to cells where Δ_physician ≠ 0. Epsilon threshold applied to near-zero LLM deltas.\n",
+        "Restricted to cells where Δ_physician ≠ 0. Epsilon threshold applied to near-zero LLM deltas, "
+        "which count as disagreement, so chance agreement is not 0.5. The reference is a permutation "
+        "null that shuffles each patient's model deltas among that patient's items.\n",
     ]
 
     for model, grp in (h2_df.groupby("model") if h2_df is not None and not h2_df.empty else []):
@@ -293,7 +301,12 @@ def _section_h2(h2_df: pd.DataFrame, cats: list[str]) -> str:
         lines.append(f"- **Mean alignment (shuffled):** {_fmt(r.get('mean_alignment_shuffled'))} "
                      f"95% CI {_fmt_ci(r.get('ci_low_shuffled'), r.get('ci_high_shuffled'))}")
         lines.append(f"- **Sign agreement (correct):** {_fmt(r.get('sign_agreement_correct'))}")
-        lines.append(f"- **Sign agreement (shuffled):** {_fmt(r.get('sign_agreement_shuffled'))}\n")
+        lines.append(f"- **Sign agreement (shuffled):** {_fmt(r.get('sign_agreement_shuffled'))}")
+        lines.append(f"- **Chance agreement (permutation null):** {_fmt(r.get('null_sign_agreement_correct'))}, "
+                     f"p = {_fmt_p(r.get('permutation_p_correct'))}")
+        lines.append(f"- **Shift cells with no LLM movement (counted as disagreement):** "
+                     f"correct {_fmt(r.get('unchanged_rate_correct'))}, "
+                     f"shuffled {_fmt(r.get('unchanged_rate_shuffled'))}\n")
 
         lines.append("| Category | Sign Agree Correct | Sign Agree Shuffled | n Shift Cells |")
         lines.append("|---|---|---|---|")

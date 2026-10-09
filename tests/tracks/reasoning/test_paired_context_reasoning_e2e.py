@@ -152,12 +152,16 @@ class TestHypothesisExecution:
 
         # H1 should have a numeric result (the section exists with data)
         assert "### Context sensitivity (formerly H1)" in content
-        # The aggregate mean absolute delta line should exist (even if 0.0000)
-        assert "Aggregate mean absolute delta:**" in content
+        # The mean absolute delta lines should exist (even if 0.0000), with
+        # the shuffled-context reference and its paired test
+        assert "Mean absolute delta, correct context:**" in content
+        assert "Mean absolute delta, shuffled context:**" in content
+        assert "Difference (correct − shuffled):**" in content
 
-        # H2 should have sign agreement rate section
+        # H2 should have sign agreement rate section, with its chance level
         assert "### Directional alignment (formerly H2)" in content
         assert "Sign agreement rate:**" in content
+        assert "Chance agreement (within-patient permutation null):**" in content
 
         # H3 should have Pearson r section (may be NaN for constant mock data,
         # which is a valid statistical result — not a pipeline skip)

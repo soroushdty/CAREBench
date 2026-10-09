@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Track 3's `context_sensitivity` and `directional_alignment` now have a reference and a test** (#17). Both used to report only an estimate with a CI, which almost any model would pass.
+  - `context_sensitivity` is tested against the shuffled-context condition. It reports mean |Δ| for correct and shuffled context, their paired difference with a patient-cluster CI, and a one-sided patient-cluster sign-flip p-value (`p_value`; `paired_permutation_p` in the post-hoc bundle).
+  - `directional_alignment` reports the sign-agreement rate expected by chance and a one-sided p-value. Both come from a permutation null that shuffles each patient's model deltas among that patient's items (`null_sign_agreement_rate`, `p_value`; `null_sign_agreement_correct`, `permutation_p_correct` on the bundle's aggregate row). It also reports the shuffled-context rates.
+  - Both endpoints report how often the model's delta is zero (`zero_delta_rate*`), or below `epsilon` in the bundle (`unchanged_rate_*`), because zero deltas count as disagreement.
+  - The run report, the bundle report and `hypothesis_summary.csv` show the new values (new summary columns: `context_sensitivity_mean_abs_delta_difference`, `context_sensitivity_p_value`, `directional_alignment_null_sign_agreement`, `directional_alignment_p_value`). Existing columns are unchanged.
+  - The shared helper is `shared.statistical.cluster_tests.within_cluster_permutation_test`.
 - **Renamed from CAREBench to LM-ContextProbe** (#19). Two published health-LLM benchmarks are already called CARE-Bench, and "bench" implied a fixed dataset with a leaderboard. The GitHub repository is now `soroushdty/LM-ContextProbe` (old URLs redirect) and the package name is `lm-contextprobe`. Import paths (`shared`, `tracks`, `adapters`) are unchanged. In the Colab notebook, the clone directory and default Drive folder are now `LM-ContextProbe`.
 
 - **Track 3 no longer called an "assay"** (#19 follow-up). Renamed paths: `configs/assay_config.yaml` → `configs/reasoning_config.yaml`, `tracks/reasoning/run_assay.py` → `tracks/reasoning/run_reasoning.py` (`python -m tracks.reasoning.run_reasoning`), and the default output folder `output/assay/` → `output/reasoning/`. The Track 3 report title is now "Track 3 (Reasoning) Context-Shift Report". `python main.py --track reasoning` works as before; pass `--config configs/reasoning_config.yaml`. Existing runs under `output/assay/` are not moved.

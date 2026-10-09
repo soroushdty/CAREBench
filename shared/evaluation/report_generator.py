@@ -82,12 +82,17 @@ class ReportGenerator:
         Dict returned by ``HypothesisAnalyzer.compute_h1``.
         Expected keys: ``mean_abs_delta``, ``ci_lower``, ``ci_upper``,
         ``per_category`` (dict of per output_dimension dicts with
-        ``mean_abs_delta``, ``ci_lower``, ``ci_upper``).
+        ``mean_abs_delta``, ``ci_lower``, ``ci_upper``), and optionally the
+        shuffled-context reference: ``mean_abs_delta_shuffled``,
+        ``mean_abs_delta_difference`` with its CI, ``p_value``,
+        ``zero_delta_rate`` and ``zero_delta_rate_shuffled``.
     h2_result:
         Dict returned by ``HypothesisAnalyzer.compute_h2``.
         Expected keys: ``mean_alignment``, ``ci_lower_alignment``,
         ``ci_upper_alignment``, ``sign_agreement_rate``,
-        ``ci_lower_sign_agree``, ``ci_upper_sign_agree``.
+        ``ci_lower_sign_agree``, ``ci_upper_sign_agree``, and optionally
+        ``null_sign_agreement_rate``, ``p_value``, ``zero_delta_rate`` and
+        the ``*_shuffled`` rates.
     h3_result:
         Dict returned by ``HypothesisAnalyzer.compute_h3``.
         Expected keys: ``pearson_r``, ``p_value``,
@@ -278,10 +283,17 @@ class ReportGenerator:
             "(context_entity_id) with replacement "
             "to respect within-patient correlation. Permutation tests use 10 000 "
             "permutations. P-values are one-sided (fraction of permuted statistics "
-            "≥ observed statistic). The context-specificity test is a patient-cluster sign-flip test: "
-            "each patient's cells are flipped together, and with few patients all "
-            "sign patterns are enumerated, so the smallest attainable p-value is "
-            "2^−(number of patients).\n\n"
+            "≥ observed statistic). Context sensitivity is tested against the "
+            "shuffled-context condition (does the correct patient's context move "
+            "the scores more than another patient's?), and context specificity "
+            "compares alignment under the two contexts. Both use a patient-cluster "
+            "sign-flip test: each patient's cells are flipped together, and with "
+            "few patients all sign patterns are enumerated, so the smallest "
+            "attainable p-value is 2^−(number of patients). Directional "
+            "alignment is tested against a permutation null that shuffles each "
+            "patient's model deltas among that patient's items; because a zero "
+            "model delta counts as disagreement, chance agreement is this null's "
+            "mean, not 0.5.\n\n"
             "This report does **not** include Brier score, F1, AUROC, or any measure "
             "of prediction accuracy. The endpoints are context sensitivity, "
             "directional alignment, class-level correspondence, and correct-versus-"
@@ -308,13 +320,24 @@ class ReportGenerator:
         lines = [
             f"### {self._heading(CONTEXT_SENSITIVITY)}\n",
             f"**Hypothesis:** The LLM (candidate_id) changes its {self._category_adjective()} "
-            "scores (output_dimension) when patient context (context_entity_id) "
-            "is added (mean absolute Delta_LLM_Correct > 0).\n",
-            f"- **Aggregate mean absolute delta:** {point}  ",
-            f"- **95% CI:** {ci}\n",
+            "scores (output_dimension) more when the correct patient's context "
+            "(context_entity_id) is added than when another patient's (shuffled) "
+            "context is (mean |Delta_LLM_Correct| − mean |Delta_LLM_Shuffled| > 0). "
+            "Almost any added text moves the scores, so the shuffled context, "
+            "not zero, is the reference.\n",
+            f"- **Mean absolute delta, correct context:** {point} (95% CI {ci})  ",
+            f"- **Mean absolute delta, shuffled context:** "
+            f"{_fmt(h1.get('mean_abs_delta_shuffled'))} "
+            f"(95% CI {_fmt_ci(h1.get('ci_lower_shuffled'), h1.get('ci_upper_shuffled'))})  ",
+            f"- **Difference (correct − shuffled):** "
+            f"{_fmt(h1.get('mean_abs_delta_difference'))} "
+            f"(95% CI {_fmt_ci(h1.get('ci_lower_difference'), h1.get('ci_upper_difference'))})  ",
+            f"- **Patient-cluster sign-flip p-value:** {_fmt_p(h1.get('p_value'))}  ",
+            f"- **Cells with zero delta:** correct {_fmt(h1.get('zero_delta_rate'))}, "
+            f"shuffled {_fmt(h1.get('zero_delta_rate_shuffled'))}\n",
             "#### Per-Category Breakdown\n",
-            "| Category | Mean Absolute Delta | 95% CI |",
-            "|---|---|---|",
+            "| Category | Mean Absolute Delta | 95% CI | Shuffled | Correct − Shuffled |",
+            "|---|---|---|---|---|",
         ]
 
         per_cat: dict[str, Any] = h1.get("per_category", {})
@@ -322,7 +345,9 @@ class ReportGenerator:
             cat_data = per_cat.get(cat, {})
             cat_point = _fmt(cat_data.get("mean_abs_delta"))
             cat_ci = _fmt_ci(cat_data.get("ci_lower"), cat_data.get("ci_upper"))
-            lines.append(f"| {label} | {cat_point} | {cat_ci} |")
+            cat_s = _fmt(cat_data.get("mean_abs_delta_shuffled"))
+            cat_d = _fmt(cat_data.get("mean_abs_delta_difference"))
+            lines.append(f"| {label} | {cat_point} | {cat_ci} | {cat_s} | {cat_d} |")
 
         return "\n".join(lines)
 
@@ -341,7 +366,17 @@ class ReportGenerator:
             f"- **Mean alignment score:** {mean_align}  ",
             f"- **95% CI (alignment):** {ci_align}  ",
             f"- **Sign agreement rate:** {sign_rate}  ",
-            f"- **95% CI (sign agreement):** {ci_sign}\n",
+            f"- **95% CI (sign agreement):** {ci_sign}  ",
+            f"- **Chance agreement (within-patient permutation null):** "
+            f"{_fmt(h2.get('null_sign_agreement_rate'))}  ",
+            f"- **Permutation p-value:** {_fmt_p(h2.get('p_value'))}  ",
+            f"- **Sign agreement rate, shuffled context:** "
+            f"{_fmt(h2.get('sign_agreement_rate_shuffled'))}  ",
+            f"- **Mean alignment, shuffled context:** "
+            f"{_fmt(h2.get('mean_alignment_shuffled'))}  ",
+            f"- **Shift cells with zero model delta (counted as disagreement):** "
+            f"correct {_fmt(h2.get('zero_delta_rate'))}, "
+            f"shuffled {_fmt(h2.get('zero_delta_rate_shuffled'))}\n",
             "#### Per-Category Sign Agreement Rate\n",
         ]
 
@@ -452,10 +487,17 @@ class ReportGenerator:
                 "—",
             ),
             (
-                f"{DIRECTIONAL_ALIGNMENT.title} (sign agreement rate)",
+                f"{CONTEXT_SENSITIVITY.title} (correct − shuffled mean absolute delta)",
+                _fmt(h1.get("mean_abs_delta_difference")),
+                _fmt_ci(h1.get("ci_lower_difference"), h1.get("ci_upper_difference")),
+                _fmt_p(h1.get("p_value")),
+            ),
+            (
+                f"{DIRECTIONAL_ALIGNMENT.title} (sign agreement rate; chance "
+                f"{_fmt(h2.get('null_sign_agreement_rate'))})",
                 _fmt(h2.get("sign_agreement_rate")),
                 _fmt_ci(h2.get("ci_lower_sign_agree"), h2.get("ci_upper_sign_agree")),
-                "—",
+                _fmt_p(h2.get("p_value")),
             ),
             (
                 f"{DIRECTIONAL_ALIGNMENT.title} (mean alignment)",

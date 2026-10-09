@@ -1,4 +1,4 @@
-"""Patient-cluster sign-flip randomization test.
+"""Patient-cluster randomization tests.
 
 Cells (for example (patient, item, class) observations) from the same
 patient share a context snapshot and a reference observer group, so they
@@ -12,10 +12,17 @@ are enumerated when that number does not exceed ``n_permutations``.  This
 also means the smallest attainable one-sided p-value is ``2 ** -n_clusters``
 (1/64 with six patients), which is the honest limit of a design with that
 many patients.
+
+The within-cluster permutation test asks a different question: whether a
+model's deltas line up with the reference deltas of *the same item*, rather
+than merely with the patient's items in general.  It shuffles the model's
+delta rows among the items of each patient and leaves the reference deltas
+in place.
 """
 from __future__ import annotations
 
 import itertools
+from typing import Callable
 
 import numpy as np
 
@@ -77,3 +84,67 @@ def cluster_sign_flip_test(
     signs = rng.choice(np.array([1.0, -1.0]), size=(n_permutations, n_clusters))
     null = signs @ sums
     return float((1 + np.sum(null >= observed - tol)) / (n_permutations + 1))
+
+
+def within_cluster_permutation_test(
+    statistic_fn: Callable[[np.ndarray], float],
+    rows: np.ndarray,
+    cluster_ids: np.ndarray,
+    n_permutations: int = 10_000,
+    rng: np.random.Generator | None = None,
+) -> dict[str, float]:
+    """One-sided test that permutes ``rows`` within each cluster.
+
+    Each null replicate reorders the rows of every cluster at random and
+    recomputes ``statistic_fn``.  A row moves as a whole, so dependence
+    between the columns of one row (for example the classes of one item) is
+    kept.  Clusters with a single row contribute nothing to the null.
+
+    Args:
+        statistic_fn: Maps a permuted copy of ``rows`` (same shape) to a
+            scalar.  It closes over whatever stays fixed, such as the
+            reference deltas.
+        rows: (n, ...) array whose rows are exchangeable within a cluster
+            under the null (for example model deltas, one row per item).
+        cluster_ids: (n,) cluster (patient) ID for each row.
+        n_permutations: Monte Carlo replicates.
+        rng: Generator for the permutations.
+
+    Returns:
+        Dict with ``observed``, ``null_mean`` (the statistic's value expected
+        by chance) and ``p_value`` = (1 + #{null >= observed}) /
+        (n_permutations + 1).  All NaN if the observed statistic is NaN.
+    """
+    rows = np.asarray(rows)
+    cluster_ids = np.asarray(cluster_ids)
+    if rows.shape[0] != cluster_ids.shape[0]:
+        raise ValueError(
+            f"rows and cluster_ids must have the same length, got "
+            f"{rows.shape[0]} and {cluster_ids.shape[0]}"
+        )
+
+    nan = float("nan")
+    observed = float(statistic_fn(rows))
+    if np.isnan(observed):
+        return {"observed": nan, "null_mean": nan, "p_value": nan}
+
+    if rng is None:
+        rng = np.random.default_rng()
+
+    groups = [np.flatnonzero(cluster_ids == c) for c in np.unique(cluster_ids)]
+    groups = [g for g in groups if g.size > 1]
+    order = np.arange(rows.shape[0])
+
+    null = np.empty(n_permutations, dtype=np.float64)
+    for i in range(n_permutations):
+        perm = order.copy()
+        for g in groups:
+            perm[g] = rng.permutation(g)
+        null[i] = statistic_fn(rows[perm])
+
+    tol = 1e-12 * max(1.0, abs(observed))
+    return {
+        "observed": observed,
+        "null_mean": float(np.nanmean(null)),
+        "p_value": float((1 + np.sum(null >= observed - tol)) / (n_permutations + 1)),
+    }

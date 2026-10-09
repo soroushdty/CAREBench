@@ -81,7 +81,7 @@ Earlier versions numbered hypotheses per track, and the numbers clashed: Track 1
 
 | Endpoint | Question | Track 3 | Track 1 |
 |----------|----------|---------|---------|
-| `context_sensitivity` | Does adding patient context change the model's scores? | ✓ (formerly H1) | — |
+| `context_sensitivity` | Does the correct patient's context change the model's scores more than another patient's context does? | ✓ (formerly H1) | — |
 | `directional_alignment` | Does the score change in the same direction as the reference observers' judgment? | ✓ (formerly H2) | ✓ (formerly H1) |
 | `class_correspondence` | Do the categories that shift most for the reference observers also shift most for the model? | ✓ (formerly H3) | — |
 | `context_specificity` | Is the alignment specific to the correct patient's context, compared with a shuffled context? | ✓ (formerly H4) | — (needs a shuffled condition, [#11](https://github.com/soroushdty/LM-ContextProbe/issues/11)) |
@@ -91,12 +91,14 @@ Earlier versions numbered hypotheses per track, and the numbers clashed: Track 1
 
 | | Statistic | Uncertainty / test |
 |---|---|---|
-| **`context_sensitivity`** | Mean \|Δ_model\| over all cells, overall and per category | Patient-cluster bootstrap 95% CI |
-| **`directional_alignment`** | On cells with Δ_ref ≠ 0: mean alignment `sign(Δ_ref)·Δ_model`, and sign-agreement rate `sign(Δ_model) = sign(Δ_ref)` | Patient-cluster bootstrap 95% CIs |
+| **`context_sensitivity`** | Mean \|Δ_model\| and mean \|Δ_shuffled\| over all cells, overall and per category; their paired difference `|Δ_model| − |Δ_shuffled|` | Patient-cluster bootstrap 95% CIs; one-sided patient-cluster sign-flip test of the difference > 0 |
+| **`directional_alignment`** | On cells with Δ_ref ≠ 0: mean alignment `sign(Δ_ref)·Δ_model`, and sign-agreement rate `sign(Δ_model) = sign(Δ_ref)`; the same for Δ_shuffled | Patient-cluster bootstrap 95% CIs; one-sided permutation test of the sign-agreement rate against a null that shuffles each patient's model deltas among that patient's items |
 | **`class_correspondence`** | Pearson *r* between the per-category mean Δ_ref and mean Δ_model | One-sided permutation test over category labels |
 | **`context_specificity`** | On cells with Δ_ref ≠ 0: mean of `sign(Δ_ref)·(Δ_model − Δ_shuffled)` | Patient-cluster bootstrap 95% CI; one-sided patient-cluster sign-flip test |
 
-A zero model delta counts as disagreement in the sign-agreement rate.
+**Why the references.** Mean \|Δ_model\| is above zero for almost any model that reads its input, so a CI that excludes zero shows only that the prompt changed. The test is therefore whether the correct patient's context moves the scores more than another patient's does.
+
+A zero model delta counts as disagreement in the sign-agreement rate, so chance agreement is not 0.5: it depends on how often the model's score does not move and on which direction it tends to move in. The permutation null keeps both, because it moves each item's whole row of model deltas to another item of the same patient, and breaks only the match between the model's and the reference's shift on the same item. Its mean is reported as the chance agreement rate. Both endpoints also report the share of cells with a zero model delta (`zero_delta_rate`), and the post-hoc bundle reports the share below `epsilon` (`unchanged_rate_*`).
 
 ### Track 1 (`tracks/representation/statistical/`)
 
@@ -115,7 +117,8 @@ Secondary and descriptive outputs: Wasserstein distance to the label distributio
 
 - **Bootstrap.** All confidence intervals are percentile intervals from a patient-cluster bootstrap (`shared/statistical/bootstrap.py`): whole patients are resampled with replacement, default 1,000 resamples. With fewer than two patients the CI is reported as NaN.
 - **Permutation tests.** Default 10,000 permutations. p-values are one-sided, in the direction of the hypothesis.
-- **Patient-cluster sign-flip test** (`shared/statistical/cluster_tests.py`). Used wherever a test compares cell-level values with zero (`context_specificity` in Track 3; the per-class `directional_alignment`, its across-class CMH companion and `brier_improvement` in Track 1). Under the null, each patient's summed contribution is symmetric about zero, so its sign is flipped as a block; the statistic is the mean over cells. When `2^(number of patients)` is at most the permutation count, all sign patterns are enumerated and the test is exact. **The smallest attainable p-value is then `2^−(number of patients)`**: 1/64 with six patients, 1/1024 with ten. This floor is the real limit of a design with that many patients, not an artifact of the test. Tests that treat cells as independent (`binom_p`, `p_cmh`, `wilcoxon_p`) are still written to the outputs for comparison but are not used for decisions.
+- **Within-patient permutation test** (`within_cluster_permutation_test` in `shared/statistical/cluster_tests.py`). Used for Track 3's `directional_alignment`; Track 1's pooled `directional_alignment` uses the same null, implemented in `h1.py`. Model delta rows are shuffled among the items of each patient while the reference deltas stay in place, so the test asks whether the model matches the reference on *the same item*, not only on the patient's items in general. Patients with a single item contribute nothing to the null.
+- **Patient-cluster sign-flip test** (`shared/statistical/cluster_tests.py`). Used wherever a test compares cell-level values with zero (`context_sensitivity` and `context_specificity` in Track 3; the per-class `directional_alignment`, its across-class CMH companion and `brier_improvement` in Track 1). Under the null, each patient's summed contribution is symmetric about zero, so its sign is flipped as a block; the statistic is the mean over cells. When `2^(number of patients)` is at most the permutation count, all sign patterns are enumerated and the test is exact. **The smallest attainable p-value is then `2^−(number of patients)`**: 1/64 with six patients, 1/1024 with ten. This floor is the real limit of a design with that many patients, not an artifact of the test. Tests that treat cells as independent (`binom_p`, `p_cmh`, `wilcoxon_p`) are still written to the outputs for comparison but are not used for decisions.
 - **Multiplicity.** Track 1 applies Benjamini–Hochberg (q = 0.05) across classes. Track 3 reports per-category results descriptively and does not correct them.
 - **Seeds.** Bootstrap, permutation, shuffled-context and generation seeds are set in config and recorded in the run manifest. `PYTHONHASHSEED` must be set before Python starts (see the README).
 
@@ -144,7 +147,7 @@ Results are claims about **the patients and reference observers in the evaluated
 
 These are known gaps between the intended design and the current code.
 
-- **Track 3's `context_sensitivity` and `directional_alignment` have intervals but no reference point.** Mean \|Δ_model\| is above zero for almost any model that reads the context at all, and the chance level of the sign-agreement rate is not 0.5 when zero deltas count as disagreement. The shuffled-context condition provides the natural reference for both. ([#17](https://github.com/soroushdty/LM-ContextProbe/issues/17))
+- **Track 1's per-class `directional_alignment` test compares the agreement rate with 0.5.** A model that shifts most scores in the direction most reference shifts go can beat 0.5 without matching any particular item. The pooled Track 1 test uses the within-patient permutation null and is not affected. Track 1's continuous outputs make exact zero deltas rare, so ties matter less there than in Track 3.
 - **`class_correspondence` is a correlation over the number of categories** (ten by default), so it has little power and is best read descriptively.
 - **No simulation-based validation yet.** The false-positive rate and power of the endpoints under known effects have not been measured. ([#18](https://github.com/soroushdty/LM-ContextProbe/issues/18))
 - **One label taxonomy** ([#5](https://github.com/soroushdty/LM-ContextProbe/issues/5)) and **one dataset format** ([#6](https://github.com/soroushdty/LM-ContextProbe/issues/6)) so far.

@@ -63,7 +63,7 @@ The central question is: **Does a model change its privacy-category judgment whe
 
 The endpoints have the same names in every track (`shared/endpoints.py`; statistics and tests per track are in [`docs/methodology.md`](docs/methodology.md#endpoints)):
 
-- **`context_sensitivity`**: Does the model's mean absolute delta (correct-context minus context-free) exceed zero? *(Track 3; formerly H1)*
+- **`context_sensitivity`**: Does the correct patient's context move the model's scores more than another patient's (shuffled) context does? Compares mean absolute deltas (context minus context-free) under the two contexts. *(Track 3; formerly H1)*
 - **`directional_alignment`**: Do the model's context-induced deltas agree in sign with the physicians' judgment deltas? *(Track 3, formerly H2; Track 1, formerly H1)*
 - **`class_correspondence`**: Do class-level mean model deltas correlate with class-level mean physician deltas across the categories? *(Track 3; formerly H3)*
 - **`context_specificity`**: Does the correct patient's context produce stronger alignment with the physician deltas than a shuffled (wrong-patient) context? *(Track 3; formerly H4)*

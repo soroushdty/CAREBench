@@ -3,8 +3,10 @@ Hypothesis Analyzer for Track 3 (reasoning).
 
 Computes Track 3's endpoints (shared/endpoints.py) with patient-cluster
 bootstrap CIs and permutation-test p-values: context sensitivity (formerly
-H1), directional alignment (H2), class-level correspondence (H3) and context
-specificity (H4, patient-cluster sign-flip test). Method names keep the old
+H1, tested against shuffled context with a patient-cluster sign-flip test),
+directional alignment (H2, within-patient permutation null), class-level
+correspondence (H3) and context specificity (H4, patient-cluster sign-flip
+test). Method names keep the old
 numbers (compute_h1 ... compute_h4).
 
 Reuses ``shared.statistical.bootstrap.patient_block_bootstrap`` for
@@ -33,7 +35,10 @@ import scipy.stats
 
 from shared.label_space import DEFAULT_LABEL_SPACE
 from shared.statistical.bootstrap import patient_block_bootstrap
-from shared.statistical.cluster_tests import cluster_sign_flip_test
+from shared.statistical.cluster_tests import (
+    cluster_sign_flip_test,
+    within_cluster_permutation_test,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -279,8 +284,14 @@ class HypothesisAnalyzer:
         self,
         context_free_scores: np.ndarray,
         correct_context_scores: np.ndarray,
+        shuffled_context_scores: np.ndarray | None = None,
     ) -> dict[str, Any]:
-        """Compute H1: mean absolute Delta_LLM_Correct with bootstrap CI.
+        """Compute H1: mean absolute Delta_LLM_Correct, against shuffled context.
+
+        Mean |Δ_correct| is above zero for almost any model that reads its
+        input, so the reference is the shuffled-context condition: the test
+        is whether the correct patient's context moves the scores more than
+        another patient's does.
 
         Parameters
         ----------
@@ -290,6 +301,10 @@ class HypothesisAnalyzer:
         correct_context_scores:
             Shape ``(N, D)`` — candidate_id scores under
             reference_correct_context condition.
+        shuffled_context_scores:
+            Optional shape ``(N, D)`` — scores with another patient's
+            context. Rows containing NaN are left out of the shuffled and
+            difference statistics only.
 
         Returns
         -------
@@ -297,8 +312,19 @@ class HypothesisAnalyzer:
             - ``mean_abs_delta`` (float): aggregate point estimate
             - ``ci_lower`` (float): 2.5th percentile of bootstrap distribution
             - ``ci_upper`` (float): 97.5th percentile
+            - ``zero_delta_rate`` (float): fraction of cells with Δ_correct = 0
+            - ``mean_abs_delta_shuffled``, ``ci_lower_shuffled``,
+              ``ci_upper_shuffled``, ``zero_delta_rate_shuffled``: the same for
+              Δ_shuffled
+            - ``mean_abs_delta_difference``, ``ci_lower_difference``,
+              ``ci_upper_difference``: mean of |Δ_correct| − |Δ_shuffled|
+            - ``p_value`` (float): one-sided patient-cluster sign-flip test of
+              that difference > 0
             - ``per_category`` (dict): per output_dimension results, each with
-              ``mean_abs_delta``, ``ci_lower``, ``ci_upper``
+              ``mean_abs_delta``, ``ci_lower``, ``ci_upper``,
+              ``mean_abs_delta_shuffled`` and ``mean_abs_delta_difference``
+
+        The shuffled and difference keys are NaN without shuffled scores.
         """
         context_free_scores = np.asarray(context_free_scores, dtype=float)
         correct_context_scores = np.asarray(correct_context_scores, dtype=float)
@@ -306,6 +332,8 @@ class HypothesisAnalyzer:
 
         delta_llm_correct = correct_context_scores - context_free_scores  # (N, D)
         abs_delta = np.abs(delta_llm_correct)  # (N, D)
+
+        shuffled = self._shuffled_rows(context_free_scores, shuffled_context_scores)
 
         # --- Aggregate ---
         aggregate_point = float(np.mean(abs_delta))
@@ -342,17 +370,95 @@ class HypothesisAnalyzer:
                 n_resamples=self._n_bootstrap,
                 rng=rng_cat,
             )
+            cat_shuffled = cat_diff = float("nan")
+            if shuffled is not None:
+                rows, delta_shuffled = shuffled
+                cat_s = np.abs(delta_shuffled[:, c_idx])
+                cat_shuffled = float(np.mean(cat_s))
+                cat_diff = float(np.mean(cat_abs_delta[rows] - cat_s))
             per_category[cat_name] = {
                 "mean_abs_delta": cat_point,
                 "ci_lower": cat_lo,
                 "ci_upper": cat_hi,
+                "mean_abs_delta_shuffled": cat_shuffled,
+                "mean_abs_delta_difference": cat_diff,
             }
 
         return {
             "mean_abs_delta": aggregate_point,
             "ci_lower": ci_lower,
             "ci_upper": ci_upper,
+            "zero_delta_rate": float(np.mean(delta_llm_correct == 0.0)),
+            **self._h1_shuffled_reference(abs_delta, shuffled),
             "per_category": per_category,
+        }
+
+    def _shuffled_rows(
+        self,
+        context_free_scores: np.ndarray,
+        shuffled_context_scores: np.ndarray | None,
+    ) -> tuple[np.ndarray, np.ndarray] | None:
+        """Rows with valid shuffled scores and their Δ_shuffled, or ``None``."""
+        if shuffled_context_scores is None:
+            return None
+        shuffled_context_scores = np.asarray(shuffled_context_scores, dtype=float)
+        self._validate_inputs(context_free_scores, shuffled_context_scores)
+        rows = np.flatnonzero(~np.any(np.isnan(shuffled_context_scores), axis=1))
+        if rows.size == 0:
+            return None
+        return rows, shuffled_context_scores[rows] - context_free_scores[rows]
+
+    def _h1_shuffled_reference(
+        self,
+        abs_delta: np.ndarray,
+        shuffled: tuple[np.ndarray, np.ndarray] | None,
+    ) -> dict[str, float]:
+        """Mean |Δ_shuffled| and the paired correct − shuffled difference."""
+        nan = float("nan")
+        if shuffled is None:
+            return {
+                "mean_abs_delta_shuffled": nan,
+                "ci_lower_shuffled": nan,
+                "ci_upper_shuffled": nan,
+                "zero_delta_rate_shuffled": nan,
+                "mean_abs_delta_difference": nan,
+                "ci_lower_difference": nan,
+                "ci_upper_difference": nan,
+                "p_value": nan,
+            }
+
+        rows, delta_shuffled = shuffled
+        abs_shuffled = np.abs(delta_shuffled)  # (M, D)
+        diff = abs_delta[rows] - abs_shuffled  # (M, D)
+        pids = self._patient_ids[rows]
+
+        def _mean_of(values: np.ndarray) -> Callable[[np.ndarray], float]:
+            return lambda idx: float(np.mean(values[idx]))
+
+        lo_s, hi_s = patient_cluster_bootstrap(
+            _mean_of(abs_shuffled), abs_shuffled, pids, self._n_bootstrap,
+            np.random.default_rng(self._bootstrap_seed + 1000),
+        )
+        lo_d, hi_d = patient_cluster_bootstrap(
+            _mean_of(diff), diff, pids, self._n_bootstrap,
+            np.random.default_rng(self._bootstrap_seed + 2000),
+        )
+        D = diff.shape[1]
+        p_value = cluster_sign_flip_test(
+            diff.ravel(),
+            np.repeat(pids, D),
+            n_permutations=self._n_permutations,
+            rng=np.random.default_rng(self._permutation_seed),
+        )
+        return {
+            "mean_abs_delta_shuffled": float(np.mean(abs_shuffled)),
+            "ci_lower_shuffled": lo_s,
+            "ci_upper_shuffled": hi_s,
+            "zero_delta_rate_shuffled": float(np.mean(delta_shuffled == 0.0)),
+            "mean_abs_delta_difference": float(np.mean(diff)),
+            "ci_lower_difference": lo_d,
+            "ci_upper_difference": hi_d,
+            "p_value": p_value,
         }
 
     # ------------------------------------------------------------------
@@ -364,10 +470,16 @@ class HypothesisAnalyzer:
         context_free_scores: np.ndarray,
         correct_context_scores: np.ndarray,
         delta_physician: np.ndarray,
+        shuffled_context_scores: np.ndarray | None = None,
     ) -> dict[str, Any]:
-        """Compute H2: mean alignment and sign agreement rate with bootstrap CIs.
+        """Compute H2: mean alignment and sign agreement rate, against chance.
 
         Restricted to cells where ``delta_physician`` (delta_reference) != 0.
+        A zero model delta counts as disagreement, so chance agreement is not
+        0.5. The reference is a permutation null that shuffles each patient's
+        model delta rows among that patient's items, which keeps the
+        model's overall tendencies (how often it moves, and in which
+        direction) and breaks only the item-level match.
 
         Parameters
         ----------
@@ -379,6 +491,10 @@ class HypothesisAnalyzer:
             Shape ``(N, D)`` — reference_observer delta matrix
             (delta_reference: reference_correct_context minus
             reference_context_free).
+        shuffled_context_scores:
+            Optional shape ``(N, D)`` — scores with another patient's
+            context. Rows containing NaN are left out of the shuffled
+            statistics.
 
         Returns
         -------
@@ -389,6 +505,15 @@ class HypothesisAnalyzer:
             - ``sign_agreement_rate`` (float)
             - ``ci_lower_sign_agree`` (float)
             - ``ci_upper_sign_agree`` (float)
+            - ``null_sign_agreement_rate`` (float): mean of the permutation
+              null, the agreement rate expected by chance
+            - ``p_value`` (float): one-sided permutation p-value for
+              ``sign_agreement_rate`` above the null
+            - ``zero_delta_rate`` (float): fraction of the cells with
+              Δ_model = 0
+            - ``sign_agreement_rate_shuffled``, ``mean_alignment_shuffled``,
+              ``zero_delta_rate_shuffled``: the same quantities for
+              Δ_shuffled (NaN without shuffled scores)
 
         All values are ``NaN`` if there are no non-zero delta_reference cells.
         """
@@ -410,6 +535,12 @@ class HypothesisAnalyzer:
                 "sign_agreement_rate": nan,
                 "ci_lower_sign_agree": nan,
                 "ci_upper_sign_agree": nan,
+                "null_sign_agreement_rate": nan,
+                "p_value": nan,
+                "zero_delta_rate": nan,
+                "sign_agreement_rate_shuffled": nan,
+                "mean_alignment_shuffled": nan,
+                "zero_delta_rate_shuffled": nan,
             }
 
         # Flatten to 1-D arrays of non-zero cells
@@ -457,6 +588,34 @@ class HypothesisAnalyzer:
             rng=rng_sign,
         )
 
+        # --- Permutation null: model rows shuffled within patient ---
+        sign_dp = np.sign(delta_physician)
+
+        def _agree_rate(delta_model: np.ndarray) -> float:
+            return float(np.mean((sign_dp == np.sign(delta_model))[nonzero_mask]))
+
+        null = within_cluster_permutation_test(
+            _agree_rate,
+            delta_llm_correct,
+            self._patient_ids,
+            n_permutations=self._n_permutations,
+            rng=np.random.default_rng(self._permutation_seed),
+        )
+
+        # --- Shuffled-context reference ---
+        nan = float("nan")
+        sign_agree_shuffled = mean_align_shuffled = zero_shuffled = nan
+        shuffled = self._shuffled_rows(context_free_scores, shuffled_context_scores)
+        if shuffled is not None:
+            rows, delta_shuffled = shuffled
+            nz_s = nonzero_mask[rows]
+            if np.any(nz_s):
+                dp_s = sign_dp[rows][nz_s]
+                ds = delta_shuffled[nz_s]
+                sign_agree_shuffled = float(np.mean(dp_s == np.sign(ds)))
+                mean_align_shuffled = float(np.mean(dp_s * ds))
+                zero_shuffled = float(np.mean(ds == 0.0))
+
         return {
             "mean_alignment": mean_align,
             "ci_lower_alignment": ci_lo_align,
@@ -464,6 +623,12 @@ class HypothesisAnalyzer:
             "sign_agreement_rate": sign_agree_rate,
             "ci_lower_sign_agree": ci_lo_sign,
             "ci_upper_sign_agree": ci_hi_sign,
+            "null_sign_agreement_rate": null["null_mean"],
+            "p_value": null["p_value"],
+            "zero_delta_rate": float(np.mean(delta_llm_correct[nonzero_mask] == 0.0)),
+            "sign_agreement_rate_shuffled": sign_agree_shuffled,
+            "mean_alignment_shuffled": mean_align_shuffled,
+            "zero_delta_rate_shuffled": zero_shuffled,
         }
 
     # ------------------------------------------------------------------

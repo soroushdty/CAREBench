@@ -90,7 +90,7 @@ figure1_delta_histogram(
 ) -> None
 ```
 
-**What it shows (Figure 1):** A 2×5 grid of per-class bar charts showing the
+**What it shows (Figure 1):** A grid of per-class bar charts, five per row, showing the
 distribution of physician delta values across all items. Bars are color-coded by delta
 magnitude: dark red (−1.0), orange (−0.5), blue-gray (0.0), green (+0.5), dark green
 (+1.0). Each panel is annotated with `n_nz` (the count of non-zero deltas), which is the

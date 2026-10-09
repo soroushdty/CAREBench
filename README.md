@@ -60,7 +60,7 @@ The primary endpoints are:
 - **H3 — Class-Level Correspondence**: Do class-level mean LLM deltas correlate with class-level mean physician deltas across the privacy categories?
 - **H4 — Correct vs Shuffled Context Control**: Does correct patient context produce stronger alignment with physician deltas than shuffled (wrong-patient) context?
 
-The default label space is the ten sensitive-data categories used in the SHARES project: behavioral_health, diagnoses, disabilities, infectious_diseases, genetics, medications, sexual_reproductive_health, social_determinants_of_health, violence, other.
+The default label space is the ten sensitive-data categories used in the SHARES project: behavioral_health, diagnoses, disabilities, infectious_diseases, genetics, medications, sexual_reproductive_health, social_determinants_of_health, violence, other. Other taxonomies are set in config (`classes` and `class_definitions`; see [`docs/adapters.md`](docs/adapters.md#label-space-sharedlabel_spacepy)).
 
 **Scope**: Claims are scoped to the patients and reference observers of the dataset being evaluated. The endpoints measure context-induced shifts and their agreement with the reference shifts, not classification accuracy. The one exception is Track 1's H2, which tests whether context lowers the Brier score against the correct-context reference labels.
 
@@ -231,7 +231,6 @@ Planned work is tracked in [GitHub issues](https://github.com/soroushdty/CAREBen
 - **Patient-grouped cross-validation** ([#10](https://github.com/soroushdty/CAREBench/issues/10)): shared, configurable splits (leave-one-patient-out or grouped k-fold) for Tracks 1 and 2.
 - **Shuffled-context condition for Track 1** ([#11](https://github.com/soroushdty/CAREBench/issues/11)): a wrong-patient context control, so Track 1 can test whether the model uses *this* patient's context, as Track 3's H4 does.
 - **Same-model comparison across tracks** ([#12](https://github.com/soroushdty/CAREBench/issues/12)): one model family run frozen, fine-tuned, and prompted, so differences between tracks reflect the mechanism rather than the model.
-- **Configurable label taxonomy**: the reasoning track currently assumes the ten SHARES categories.
 - **Distribution-shift evaluation**: requires a second dataset in the paired-context format.
 - **Other inputs and backends**: FHIR/OMOP ingestion, confidence-weighted or adjudicated reference aggregation, and hosted-API LLM backends.
 

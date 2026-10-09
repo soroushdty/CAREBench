@@ -68,7 +68,8 @@ class DatasetLoader:
         Validated assay/reasoning configuration dictionary.
         Expected structure: ``cfg["data"]`` with keys for dataset_path,
         patient_summaries_path, train_sheet, test_sheet, interview_sheet,
-        patient_col, physician_col, item_col, classes.
+        patient_col, physician_col, item_col, classes, and optionally
+        class_definitions (see :meth:`shared.label_space.LabelSpace.from_config`).
     dataset_path : str | Path | None
         Override path to dataset file. If ``None``, resolved from config.
     adapter_name : str | None
@@ -125,6 +126,7 @@ class DatasetLoader:
             class_cols=self._class_cols,
             column_map=PairedContextColumnMap.from_config(data_cfg),
             mismatch_error=bool(data_cfg.get("mismatch_error", False)),
+            class_definitions=data_cfg.get("class_definitions"),
         )
 
     # ------------------------------------------------------------------

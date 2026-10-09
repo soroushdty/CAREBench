@@ -15,9 +15,9 @@ from typing import Any
 import pandas as pd
 
 from adapters.paired_context.column_map import PairedContextColumnMap
-from adapters.paired_context import labels as paired_context_labels
 from adapters.paired_context.reference_adapter import PairedContextReferenceAdapter
 from shared.io.excel import load_workbook_sheets
+from shared.label_space import LabelSpace
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +57,9 @@ class PairedContextDatasetAdapter:
         provided.
     mismatch_error : bool
         Passed to reference adapter if one is created internally.
+    label_space : LabelSpace | None
+        Output dimensions for the manifest. Defaults to
+        ``LabelSpace.from_config(class_cols)``.
     """
 
     def __init__(
@@ -67,9 +70,11 @@ class PairedContextDatasetAdapter:
         reference_adapter: PairedContextReferenceAdapter | None = None,
         *,
         mismatch_error: bool = False,
+        label_space: LabelSpace | None = None,
     ) -> None:
         self._dataset_path = Path(dataset_path).resolve()
         self._class_cols = list(class_cols)
+        self._label_space = label_space
         self._column_map = column_map or PairedContextColumnMap()
         self._reference_adapter = reference_adapter or PairedContextReferenceAdapter(
             column_map=self._column_map, mismatch_error=mismatch_error
@@ -90,7 +95,9 @@ class PairedContextDatasetAdapter:
             "adapter": self.name,
             "dataset_path": str(self._dataset_path),
             "column_map": self._column_map.to_dict(),
-            "label_mapping": paired_context_labels.label_manifest(),
+            "label_mapping": (
+                self._label_space or LabelSpace.from_config(self._class_cols)
+            ).manifest(),
             "reference_aggregation": self._reference_adapter.manifest(),
             "class_cols": self._class_cols,
         }

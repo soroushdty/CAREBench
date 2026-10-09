@@ -28,6 +28,7 @@ from typing import Any, Callable
 import numpy as np
 import scipy.stats
 
+from shared.label_space import DEFAULT_LABEL_SPACE
 from shared.statistical.bootstrap import patient_block_bootstrap
 from shared.statistical.cluster_tests import cluster_sign_flip_test
 
@@ -37,18 +38,8 @@ logger = logging.getLogger(__name__)
 # Privacy category names (canonical order)
 # ---------------------------------------------------------------------------
 
-CATEGORY_NAMES: list[str] = [
-    "behavioral_health",
-    "diagnoses",
-    "disabilities",
-    "infectious_diseases",
-    "genetics",
-    "medications",
-    "sexual_reproductive_health",
-    "social_determinants_of_health",
-    "violence",
-    "other",
-]
+# Default label space; the analyzer itself uses ``paired_dataset.category_names``.
+CATEGORY_NAMES: list[str] = DEFAULT_LABEL_SPACE.keys()
 
 
 # ---------------------------------------------------------------------------

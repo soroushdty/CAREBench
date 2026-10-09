@@ -32,6 +32,10 @@ Usage (combined long-format file with 'condition' column):
         --dataset dataset.xlsx \\
         --llm-scores outputs/llm_judgments/parsed_scores.csv \\
         --output-dir outputs/analysis
+
+The categories default to the ten SHARES categories. For another taxonomy,
+pass the assay config with --config; its data.classes and
+data.class_definitions are used.
 """
 
 from __future__ import annotations
@@ -50,7 +54,10 @@ _PROJECT_ROOT = os.path.dirname(_SCRIPT_DIR)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from tracks.reasoning.bundle.loader import CANONICAL_CATEGORIES, load_llm_scores, load_physician_consensus
+import yaml
+
+from shared.label_space import DEFAULT_LABEL_SPACE, LabelSpace
+from tracks.reasoning.bundle.loader import load_llm_scores, load_physician_consensus
 from tracks.reasoning.bundle.validator import validate_inputs
 from tracks.reasoning.bundle.delta_builder import build_paired_cell_deltas
 from tracks.reasoning.bundle.hypotheses import compute_h1, compute_h2, compute_h3, compute_h4
@@ -127,8 +134,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--train-sheet", dest="train_sheet", default="train")
     parser.add_argument("--survey-sheet", dest="survey_sheet", default="test")
     parser.add_argument("--interview-sheet", dest="interview_sheet", default="interview")
+    parser.add_argument(
+        "--config", default=None,
+        help=(
+            "Assay config whose data.classes and data.class_definitions define the "
+            "categories (default: the ten SHARES categories)"
+        ),
+    )
 
     return parser.parse_args(argv)
+
+
+def _load_label_space(config_path: str | None) -> tuple[LabelSpace, dict | None]:
+    """Label space and class_definitions from an assay config, or the default."""
+    if config_path is None:
+        return DEFAULT_LABEL_SPACE, None
+    with open(config_path, encoding="utf-8") as fh:
+        data_cfg = (yaml.safe_load(fh) or {}).get("data") or {}
+    if "classes" not in data_cfg:
+        raise SystemExit(f"{config_path}: no data.classes entry")
+    definitions = data_cfg.get("class_definitions")
+    return LabelSpace.from_config(data_cfg["classes"], definitions), definitions
 
 
 _CONDITION_FILES = {
@@ -267,13 +293,15 @@ def main(argv: list[str] | None = None) -> None:
 
     out = lambda name: os.path.join(args.output_dir, name)
 
-    categories = CANONICAL_CATEGORIES
+    label_space, class_definitions = _load_label_space(args.config)
+    categories = label_space.keys()
     run_params = {
         "seed": args.seed,
         "epsilon": args.epsilon,
         "n_bootstrap": args.n_bootstrap,
         "n_permutations": args.n_permutations,
         "dataset": args.dataset,
+        "categories": categories,
     }
 
     # ------------------------------------------------------------------
@@ -304,6 +332,8 @@ def main(argv: list[str] | None = None) -> None:
         train_sheet=args.train_sheet,
         survey_sheet=args.survey_sheet,
         interview_sheet=args.interview_sheet,
+        excel_classes=label_space.display_names(),
+        class_definitions=class_definitions,
     )
 
     # ------------------------------------------------------------------
@@ -465,7 +495,8 @@ def main(argv: list[str] | None = None) -> None:
         f" --epsilon {args.epsilon}"
         f" --n-bootstrap {args.n_bootstrap}"
         f" --n-permutations {args.n_permutations}"
-        f" --overwrite"
+        + (f" --config {args.config}" if args.config else "")
+        + " --overwrite"
     )
     print("=" * 60)
 

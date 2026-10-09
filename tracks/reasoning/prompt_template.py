@@ -6,54 +6,28 @@ Generates deterministic prompts for each of the three conditions:
   - correct_context
   - shuffled_context
 
-No external dependencies beyond the standard library (hashlib).
+The category list and JSON format come from a
+:class:`~shared.label_space.LabelSpace` (by default the ten SHARES
+categories).
 """
 
 from __future__ import annotations
 
 import hashlib
 
+from shared.label_space import DEFAULT_LABEL_SPACE, LabelSpace
 
 # ---------------------------------------------------------------------------
-# Privacy Category definitions
+# Default category definitions (kept as module constants for backward
+# compatibility; the source of truth is shared.label_space)
 # ---------------------------------------------------------------------------
 
 PRIVACY_CATEGORIES: dict[str, str] = {
-    "behavioral_health": (
-        "Mental health conditions, substance use disorders, psychiatric diagnoses, "
-        "and related treatments"
-    ),
-    "diagnoses": (
-        "Medical diagnoses, conditions, and clinical findings"
-    ),
-    "disabilities": (
-        "Physical, cognitive, or developmental disabilities and functional limitations"
-    ),
-    "infectious_diseases": (
-        "Communicable diseases including HIV/AIDS, STIs, tuberculosis, and hepatitis"
-    ),
-    "genetics": (
-        "Genetic test results, hereditary conditions, and family genetic history"
-    ),
-    "medications": (
-        "Prescription drugs, dosages, medication history, and pharmacological treatments"
-    ),
-    "sexual_reproductive_health": (
-        "Sexual health, reproductive conditions, contraception, pregnancy, and fertility"
-    ),
-    "social_determinants_of_health": (
-        "Housing, employment, food security, transportation, and social support factors"
-    ),
-    "violence": (
-        "Domestic violence, abuse, trauma history, and safety concerns"
-    ),
-    "other": (
-        "Sensitive health information not captured by the above categories"
-    ),
+    d.key: d.definition for d in DEFAULT_LABEL_SPACE
 }
 
 # Canonical ordered list of category names (matches glossary order)
-CATEGORY_NAMES: list[str] = list(PRIVACY_CATEGORIES.keys())
+CATEGORY_NAMES: list[str] = DEFAULT_LABEL_SPACE.keys()
 
 # ---------------------------------------------------------------------------
 # Shared prompt fragments
@@ -64,22 +38,40 @@ _INTRO = (
     "Classify the following EHR item into privacy categories."
 )
 
-_CATEGORY_HEADER = (
-    "For each of the following ten privacy categories, provide a score between 0.0 and 1.0\n"
-    "representing the probability that this item belongs to that category."
+_NUMBER_WORDS = (
+    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
+    "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+    "sixteen", "seventeen", "eighteen", "nineteen", "twenty",
 )
 
-_CATEGORY_BLOCK: str = "Categories:\n" + "\n".join(
-    f"- {name}: {definition}"
-    for name, definition in PRIVACY_CATEGORIES.items()
-)
 
-_JSON_FORMAT: str = (
-    "Respond with ONLY a JSON object in this exact format:\n"
-    "{\n"
-    + ",\n".join(f'  "{name}": <score>' for name in CATEGORY_NAMES)
-    + "\n}"
-)
+def _category_header(n_categories: int) -> str:
+    count = (
+        _NUMBER_WORDS[n_categories]
+        if n_categories < len(_NUMBER_WORDS)
+        else str(n_categories)
+    )
+    noun = "category" if n_categories == 1 else "categories"
+    return (
+        f"For each of the following {count} privacy {noun}, provide a score between 0.0 and 1.0\n"
+        "representing the probability that this item belongs to that category."
+    )
+
+
+def _category_block(label_space: LabelSpace) -> str:
+    return "Categories:\n" + "\n".join(
+        f"- {d.key}: {d.definition}" if d.definition else f"- {d.key}"
+        for d in label_space
+    )
+
+
+def _json_format(label_space: LabelSpace) -> str:
+    return (
+        "Respond with ONLY a JSON object in this exact format:\n"
+        "{\n"
+        + ",\n".join(f'  "{d.key}": <score>' for d in label_space)
+        + "\n}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -97,7 +89,24 @@ class PromptTemplate:
     Physician labels, ground-truth classifications, and any reference to
     ``Physician_Survey_Consensus``, ``Physician_Interview_Consensus``, or
     ``Delta_Physician`` are intentionally absent from every prompt variant.
+
+    Parameters
+    ----------
+    label_space : LabelSpace, optional
+        The categories listed in the prompt and required in the JSON answer.
+        Defaults to the ten SHARES categories. Categories without a
+        definition are listed by key only.
     """
+
+    def __init__(self, label_space: LabelSpace | None = None) -> None:
+        self._label_space = label_space or DEFAULT_LABEL_SPACE
+        self._header = _category_header(len(self._label_space))
+        self._category_block = _category_block(self._label_space)
+        self._json_format = _json_format(self._label_space)
+
+    @property
+    def label_space(self) -> LabelSpace:
+        return self._label_space
 
     # ------------------------------------------------------------------
     # Public prompt builders
@@ -121,11 +130,11 @@ class PromptTemplate:
             "",
             f"ITEM: {item_text}",
             "",
-            _CATEGORY_HEADER,
+            self._header,
             "",
-            _CATEGORY_BLOCK,
+            self._category_block,
             "",
-            _JSON_FORMAT,
+            self._json_format,
         ]
         return "\n".join(parts)
 
@@ -239,8 +248,7 @@ class PromptTemplate:
     # Private helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _build_context_prompt(item_text: str, context_text: str) -> str:
+    def _build_context_prompt(self, item_text: str, context_text: str) -> str:
         """Shared builder for correct-context and shuffled-context prompts."""
         parts = [
             _INTRO,
@@ -250,10 +258,10 @@ class PromptTemplate:
             "PATIENT CONTEXT:",
             context_text,
             "",
-            _CATEGORY_HEADER,
+            self._header,
             "",
-            _CATEGORY_BLOCK,
+            self._category_block,
             "",
-            _JSON_FORMAT,
+            self._json_format,
         ]
         return "\n".join(parts)

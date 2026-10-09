@@ -47,6 +47,12 @@ data:
   patient_col: Patient
   physician_col: Physician
   item_col: Item
+  # Output dimensions: one workbook column per class. Classes with these
+  # default names get their key and prompt definition from
+  # shared/label_space.py. For other classes, add class_definitions:
+  #   class_definitions:
+  #     Housing: Housing instability or homelessness
+  #     Drug therapy: {key: medications, definition: Any prescribed drug}
   classes:
     - Behavioral health
     - Diagnoses

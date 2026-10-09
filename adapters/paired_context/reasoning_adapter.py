@@ -8,7 +8,8 @@ Canonical path: adapters/paired_context/reasoning_adapter.py
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -19,8 +20,7 @@ from adapters.paired_context.column_map import PairedContextColumnMap
 from adapters.paired_context.context_adapter import PairedContextContextAdapter
 from adapters.paired_context.dataset_adapter import PairedContextDatasetAdapter
 from adapters.paired_context.reference_adapter import PairedContextReferenceAdapter
-from adapters.paired_context import labels as paired_context_labels
-
+from shared.label_space import LabelSpace
 
 # ---------------------------------------------------------------------------
 # PairedDataset DTO (reasoning-ready records)
@@ -47,6 +47,10 @@ class PairedDataset:
         Shape (N, C). Delta = correct_context - context_free.
     category_names : list[str]
         Output-dimension names (display names) in column order.
+    label_space : LabelSpace | None
+        Keys, display names and definitions of the output dimensions. When
+        omitted it is built from ``category_names`` with
+        :meth:`LabelSpace.from_config`.
     """
 
     patient_ids: np.ndarray
@@ -55,26 +59,25 @@ class PairedDataset:
     interview_consensus: np.ndarray
     delta_physician: np.ndarray
     category_names: list[str]
+    label_space: LabelSpace | None = field(default=None)
+
+    def __post_init__(self) -> None:
+        if self.label_space is None:
+            self.label_space = LabelSpace.from_config(self.category_names)
+        elif self.label_space.display_names() != list(self.category_names):
+            raise ValueError(
+                "label_space display names "
+                f"{self.label_space.display_names()} do not match category_names "
+                f"{list(self.category_names)}."
+            )
 
     @property
     def canonical_category_names(self) -> list[str]:
-        """Category names normalized to canonical snake_case keys.
+        """Output-dimension keys in the same order as :attr:`category_names`.
 
-        Uses :func:`adapters.paired_context.labels.normalize_output_dimension`
-        to map display labels (e.g. ``"Behavioral health"``) to canonical
-        keys (e.g. ``"behavioral_health"``).  Canonical keys pass through
-        unchanged.
-
-        Returns
-        -------
-        list[str]
-            Canonical output-dimension keys in the same order as
-            :attr:`category_names`.
+        For example ``"Behavioral health"`` → ``"behavioral_health"``.
         """
-        return [
-            paired_context_labels.normalize_output_dimension(name)
-            for name in self.category_names
-        ]
+        return self.label_space.keys()
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +105,9 @@ class PairedContextReasoningAdapter:
     class_cols : list[str]
         Output-dimension column names as they appear in the workbook
         (display names).
+    class_definitions : Mapping[str, Any] | None
+        Optional keys and prompt definitions per class, as accepted by
+        :meth:`shared.label_space.LabelSpace.from_config`.
     column_map : PairedContextColumnMap | None
         Column mapping. Defaults to ``PairedContextColumnMap()``.
     mismatch_error : bool
@@ -116,9 +122,11 @@ class PairedContextReasoningAdapter:
         column_map: PairedContextColumnMap | None = None,
         *,
         mismatch_error: bool = False,
+        class_definitions: Mapping[str, Any] | None = None,
     ) -> None:
         self._column_map = column_map or PairedContextColumnMap()
         self._class_cols = list(class_cols)
+        self._label_space = LabelSpace.from_config(self._class_cols, class_definitions)
         self._mismatch_error = mismatch_error
 
         self._reference_adapter = PairedContextReferenceAdapter(
@@ -131,6 +139,7 @@ class PairedContextReasoningAdapter:
             column_map=self._column_map,
             reference_adapter=self._reference_adapter,
             mismatch_error=mismatch_error,
+            label_space=self._label_space,
         )
         # Context records are only needed for context building, not for
         # loading reference labels, so the summaries file is optional here.
@@ -160,7 +169,7 @@ class PairedContextReasoningAdapter:
                 else None
             ),
             "reference": self._reference_adapter.manifest(),
-            "label_mapping": paired_context_labels.label_manifest(),
+            "label_mapping": self._label_space.manifest(),
             "column_map": self._column_map.to_dict(),
         }
 
@@ -207,6 +216,7 @@ class PairedContextReasoningAdapter:
             interview_consensus=interview_matrix,
             delta_physician=delta_matrix,
             category_names=list(self._class_cols),
+            label_space=self._label_space,
         )
 
     # ------------------------------------------------------------------
@@ -231,6 +241,11 @@ class PairedContextReasoningAdapter:
     def reference_adapter(self) -> PairedContextReferenceAdapter:
         """Access the underlying reference adapter."""
         return self._reference_adapter
+
+    @property
+    def label_space(self) -> LabelSpace:
+        """The output dimensions this adapter loads."""
+        return self._label_space
 
     @property
     def column_map(self) -> PairedContextColumnMap:

@@ -71,6 +71,18 @@ VALID_BACKENDS: set[str] = {"huggingface", "dry_run", "local_transformers"}
 # Public API
 # ---------------------------------------------------------------------------
 
+def validate_label_space_config(data_section: dict[str, Any]) -> None:
+    """Check that ``classes`` and ``class_definitions`` form a valid label space."""
+    from shared.label_space import LabelSpace
+
+    try:
+        LabelSpace.from_config(
+            data_section["classes"], data_section.get("class_definitions")
+        )
+    except ValueError as exc:
+        raise ConfigError(f"Invalid label space in 'data': {exc}") from exc
+
+
 def load_config(config_path: str | Path) -> dict[str, Any]:
     """Load and validate the assay configuration file.
 
@@ -140,6 +152,7 @@ def load_config(config_path: str | Path) -> dict[str, Any]:
             f"Missing required 'data' configuration parameter(s): {', '.join(missing_data)}"
         )
 
+    validate_label_space_config(data_section)
     return cfg
 
 
@@ -221,6 +234,7 @@ def _validate_config_dict(cfg: dict[str, Any]) -> dict[str, Any]:
             f"Missing required 'data' configuration parameter(s): {', '.join(missing_data)}"
         )
 
+    validate_label_space_config(data_section)
     return cfg
 
 

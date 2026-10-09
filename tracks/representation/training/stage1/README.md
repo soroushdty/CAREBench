@@ -1,4 +1,4 @@
-# CAREBench Stage 1 Training
+# LM-ContextProbe Stage 1 Training
 
 **Canonical path:** `tracks/representation/training/stage1`
 

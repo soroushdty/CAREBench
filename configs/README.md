@@ -1,6 +1,6 @@
 # configs
 
-This directory contains all YAML configuration files for CAREBench.
+This directory contains all YAML configuration files for LM-ContextProbe.
 
 Canonical path: configs/
 

@@ -1,4 +1,4 @@
-# CAREBench Summary Logic
+# LM-ContextProbe Summary Logic
 
 **Canonical path:** `shared/reporting/input_summary/logic`
 

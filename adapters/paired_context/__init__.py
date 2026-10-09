@@ -1,6 +1,6 @@
 """adapters.paired_context — paired-context adapter package.
 
-Loads datasets stored in the CAREBench paired-context data format
+Loads datasets stored in the LM-ContextProbe paired-context data format
 (see ``docs/data_format.md``): an Excel workbook with a training sheet and
 two matched reference-condition sheets (context-free and correct-context),
 plus a JSON file of per-entity context records.

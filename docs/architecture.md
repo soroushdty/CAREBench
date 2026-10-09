@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the package boundaries, dependency rules, and canonical injection flows for the CAREBench framework.
+This document describes the package boundaries, dependency rules, and canonical injection flows for the LM-ContextProbe framework.
 
 ## Package Boundaries
 

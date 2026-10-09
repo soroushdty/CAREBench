@@ -1,6 +1,6 @@
 # Documentation Index
 
-This directory contains canonical documentation for CAREBench, a clinical context-shift evaluation framework.
+This directory contains canonical documentation for LM-ContextProbe, a clinical context-shift evaluation framework.
 
 | Document | Description |
 |----------|-------------|

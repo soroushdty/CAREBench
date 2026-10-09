@@ -1,4 +1,4 @@
-# CAREBench Summary Orchestrator
+# LM-ContextProbe Summary Orchestrator
 
 **Canonical path:** `shared/reporting/input_summary/orchestrator`
 

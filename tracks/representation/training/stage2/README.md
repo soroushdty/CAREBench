@@ -1,4 +1,4 @@
-# CAREBench Stage 2 Training
+# LM-ContextProbe Stage 2 Training
 
 **Canonical path:** `tracks/representation/training/stage2`
 
@@ -43,7 +43,7 @@ A trivial stand-in returned by `fit_stage2_fusion_fold` when the Stage 1 passthr
 
 #### `_compute_pos_weights(y, weight_cap, cfg) -> np.ndarray`
 
-Per-class positive-class weights capped to `[1.0, weight_cap]`. Uses Cui 2019 Effective Number of Samples (default) or inverse-frequency weighting, mirroring the Stage 1 logic. Two CAREBench-specific decisions:
+Per-class positive-class weights capped to `[1.0, weight_cap]`. Uses Cui 2019 Effective Number of Samples (default) or inverse-frequency weighting, mirroring the Stage 1 logic. Two LM-ContextProbe-specific decisions:
 
 - The positive mass is computed as the **soft sum** `valid.sum()` so that physician-disagreement labels (0.5) contribute 0.5 to positive mass rather than being binarized away by a `> 0.5` threshold.
 - The inverse-frequency denominator uses the **per-class non-NaN row count**, not the total row count, so classes with many missing interview labels are not artificially upweighted by the dataset size.
